@@ -1,0 +1,64 @@
+/* @font-face {
+  font-family: 'Tiempos Headline';
+  font-weight: 600;
+  font-style: normal;
+  src:
+    url('https://cdn.bt.no/rnd/fonts/TiemposHeadlineWeb-Semibold.woff2') format('woff2'),
+    url('https://cdn.bt.no/rnd/fonts/TiemposHeadlineWeb-Semibold.woff') format('woff'),
+    url('https://cdn.bt.no/rnd/fonts/TiemposHeadlineWeb-Semibold.eot') format('embedded-opentype');
+} */
+
+@font-face {
+  font-family: 'Inter-b4';
+  font-weight: 100 900;
+  font-style: normal;
+  src: url('https://cdn.bt.no/rnd/fonts/Inter.var.regional.v2.woff2')
+    format('woff2');
+}
+
+.b4-railroad-think {
+  --white: #ffffff;
+  --black: #333333;
+  --bt-blue: #02476c;
+
+  /* Political Parties' color */
+  --party-color-Ap: #fd4b5a;
+  --party-color-H: #0070ff;
+  --party-color-Frp: #4b08e4;
+  --party-color-Sp: #2eaf6e;
+  --party-color-SV: #ff2a7f;
+  --party-color-R: #cd0060;
+  --party-color-KrF: #f1c526;
+  --party-color-V: #61777a;
+  --party-color-MDG: #37ca08;
+  --party-color-FNB: #565b65;
+
+  --serif: 'Tiempos Headline', Georgia, 'Times New Roman', Times, serif;
+  --sans-serif: 'Inter-b4', 'Inter', -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue',
+    sans-serif;
+  --sans: var(--sans-serif);
+
+  /* Font sizes */
+  --xsmall: 11px;
+  --small: 13px;
+  --medium: 16px;
+  --large: 24px;
+  --xlarge: 24px;
+  --huge: 32px;
+  --xhuge: 38px;
+
+  /* Other sizes */
+  --s-0-5: 2px;
+  --s-1: 4px;
+  --s-1-5: 6px;
+  --s-2: 8px;
+  --s-2-5: 12px;
+  --s-3: 16px;
+  --s-3-5: 24px;
+  --s-4: 32px;
+  --s-4-5: 48px;
+  --s-5: 64px;
+
+  --ease-expo-out: cubic-bezier(0.16, 1, 0.3, 1);
+}

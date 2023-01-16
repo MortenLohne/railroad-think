@@ -1,0 +1,4 @@
+Header add Surrogate-Key "bt bt_spesial railroad-think"
+Header add Access-Control-Allow-Origin "*"
+Header add Surrogate-Control "max-age=1800"
+Header add Cache-Control "max-age=60"
