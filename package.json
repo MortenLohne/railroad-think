@@ -23,7 +23,7 @@
     "deploy": "yarn build && ./deploy.sh && bord4 integrate",
     "stage": "B4_STAGE=true yarn build && ./deploy.sh --stage",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-    "lint": "prettier src --write",
+    "lint": "prettier src --write --ignore-path .gitignore --cache src --loglevel silent",
     "purge": "curl -i -u \"purge:$PURGE_KEY\" -H \"Content-Type:application/json\" -X POST -d '{\"keys\": [\"railroad-think\"]}' https://cachepurge-api.schibsted.tech/purge/keys"
   },
   "devDependencies": {
@@ -34,8 +34,10 @@
     "@rollup/plugin-dsv": "^2.0.3",
     "@rollup/plugin-yaml": "^3.1.0",
     "@rollup/pluginutils": "^4.2.1",
+    "@sveltejs/adapter-static": "^1.0.0-next.39",
     "@sveltejs/kit": "^1.0.0-next.431",
     "@tsconfig/svelte": "^3.0.0",
+    "@types/d3-array": "^3.0.4",
     "@vanilla-extract/css": "^1.7.2",
     "@vanilla-extract/vite-plugin": "^3.3.0",
     "postcss": "^8.4.16",
@@ -49,10 +51,11 @@
     "terser": "^5.14.2",
     "tslib": "^2.4.0",
     "typescript": "^4.7.4",
-    "vite": "^3.0.9",
-    "@sveltejs/adapter-static": "^1.0.0-next.39"
+    "vite": "^3.0.9"
   },
-  "dependencies": {},
+  "dependencies": {
+    "d3-array": "^3.2.1"
+  },
   "overrides": {
     "@vanilla-extract/vite-plugin": {
       "vite": "^3"

@@ -1,0 +1,51 @@
+[package]
+name = "railroad-ink-solver"
+version = "0.1.0"
+authors = ["Havegum <halvard.alvheim.vegum@bt.no>"]
+edition = "2018"
+default-run = "main"
+description = "AI that plays Railroad Ink"
+repository = "private"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook"]
+
+[dependencies]
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+
+# The `console_error_panic_hook` crate provides better debugging of panics by
+# logging them with `console.error`. This is great for development, but requires
+# all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
+# code size when deploying.
+console_error_panic_hook = { version = "0.1.6", optional = true }
+
+# `wee_alloc` is a tiny allocator for wasm that is only ~1K in code size
+# compared to the default allocator's ~10K. It is slower than the default
+# allocator, however.
+#
+# Unfortunately, `wee_alloc` requires nightly Rust when targeting wasm for now.
+wee_alloc = { version = "0.4.5", optional = true }
+serde = { version = "1.0", features = ["derive"] }
+serde_with = "1.11.0"
+js-sys = "0.3.55"
+strum = "0.23.0"
+strum_macros = "0.23.1"
+rand = "0.8.4"
+getrandom = { version = "0.2.3", features = ["js"] }
+ord_subset = "3.1.1"
+
+[dev-dependencies]
+criterion = "0.3.5" 
+wasm-bindgen-test = "0.3.13"
+
+# [[bench]]
+# name = "my_benchmark"
+# harness = false
+
+[profile.release]
+# Tell `rustc` to optimize for small code size.
+opt-level = "s"

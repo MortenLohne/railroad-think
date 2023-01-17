@@ -1,0 +1,16 @@
+code,name
+1,L rail
+2,T rail
+3,I rail
+4,L road
+5,T road
+6,I road
+7,overpass
+8,I trans
+9,L trans
+10,X T road
+11,X T rail
+12,X road
+13,X rail
+14,X L
+15,X I
