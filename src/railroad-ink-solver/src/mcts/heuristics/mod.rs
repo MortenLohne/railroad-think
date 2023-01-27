@@ -1,91 +1,36 @@
+use crate::board::Board;
 use crate::game::mv::Move;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 use std::str::FromStr;
+pub mod nn;
+use nn::edge_strategy::EdgeStrategy;
+mod rave;
 
 pub type HeuristicOptions = [[f64; 7]; 3];
-
-#[derive(Debug, Clone)]
-pub struct RaveValue {
-    visits: u128,
-    total_score: i128,
-    mean: f64,
-}
-
-impl RaveValue {
-    #[must_use]
-    pub fn new(score: i32) -> Self {
-        Self {
-            visits: 1,
-            total_score: i128::from(score),
-            mean: f64::from(score),
-        }
-    }
-
-    #[must_use]
-    pub fn new_with_data(visits: u128, total_score: i128) -> Self {
-        Self {
-            visits,
-            total_score,
-            mean: total_score as f64 / visits as f64,
-        }
-    }
-
-    pub fn update(&mut self, score: i32) {
-        self.total_score += i128::from(score);
-        self.visits += 1;
-        self.mean = self.total_score as f64 / self.visits as f64;
-    }
-
-    #[must_use]
-    pub fn get_mean(&self) -> f64 {
-        self.mean
-    }
-
-    #[must_use]
-    pub fn get_total(&self) -> i128 {
-        self.total_score
-    }
-
-    #[must_use]
-    pub fn get_visits(&self) -> u128 {
-        self.visits
-    }
-    pub fn uniform(&mut self, weight: u128) {
-        self.total_score = (self.mean * weight as f64) as i128;
-        self.visits = weight;
-    }
-}
-
-impl Default for RaveValue {
-    fn default() -> RaveValue {
-        RaveValue {
-            visits: 0,
-            total_score: 0,
-            mean: 0.,
-        }
-    }
-}
 
 type Turn = u8;
 
 // TODO: Consider these state heuristics:
-//    Count remaining specials to place
-//    "Centrality". Give points to each placed piece as close they are to the center
-//    Connectedness. Give points to connections
-//    "Potential" connectedness. Is there a way to calculate this? Clustered frontiers?
+// * "Centrality". Give points to each placed piece as close they are to the center
+// * Connectedness. Give points to connections made, minus one for the piece placed from.
+// * "Potential" connectedness. Is there a way to calculate this? Clustered frontiers?
+// * Exit connection. Assign points for placements on the exit
+//
 #[derive(Clone)]
 pub struct Heuristics {
     pub exploration_variables: [f64; 7],
     pub special_cost: [f64; 7],
     pub frontier_size: [f64; 7],
-    pub rave: HashMap<Move, RaveValue>,
-    pub local_rave: HashMap<(Turn, Move), RaveValue>,
+    pub rave: HashMap<Move, rave::Value>,
+    pub local_rave: HashMap<(Turn, Move), rave::Value>,
     pub rave_jitter: f64,
     pub rave_exploration_bias: f64,
     pub use_rave: bool,
     pub tree_reuse: bool,
+    pub use_nn: bool,
+    pub move_evaluation_nn: EdgeStrategy,
 }
 
 impl Heuristics {
@@ -101,6 +46,8 @@ impl Heuristics {
             rave_exploration_bias: 18.0,
             use_rave: true,
             tree_reuse: true,
+            use_nn: true,
+            move_evaluation_nn: EdgeStrategy::load(),
         }
     }
 
@@ -125,10 +72,13 @@ impl Heuristics {
         file.read_to_string(&mut contents)
             .expect("Error loading Heuristics: Could not read file to string");
 
-        let mut heuristics = Heuristics::default();
+        let mut heuristics = Self::new([[0.0; 7], [0.0; 7], [0.0; 7]]);
         let mut lines = contents.split('\n');
         lines.next(); // Skip header
         for (i, line) in lines.enumerate() {
+            if i > 6 {
+                break;
+            }
             let mut values = line.split(',');
             heuristics.exploration_variables[i] = values.next().unwrap().parse().unwrap();
             heuristics.special_cost[i] = values.next().unwrap().parse().unwrap();
@@ -167,7 +117,7 @@ impl Heuristics {
     pub fn update_rave(&mut self, turn: u8, mv: &Move, score: f64) {
         self.local_rave
             .entry((turn, *mv))
-            .or_insert_with(RaveValue::default)
+            .or_insert_with(rave::Value::default)
             .update(score as i32);
     }
 
@@ -189,7 +139,7 @@ impl Heuristics {
                 let place = Move::from_str(row[0])?;
                 let visits = row[1].parse().expect("load_rave: could not parse visits");
                 let total = row[2].parse().expect("load_rave: could not parse total");
-                Ok((place, RaveValue::new_with_data(visits, total)))
+                Ok((place, rave::Value::new_with_data(visits, total)))
             })
             .collect();
         let map = map.expect("Error loading Rave: Could not parse file to HashMap");
@@ -197,7 +147,7 @@ impl Heuristics {
     }
 
     /// Export this instance of Local Rave to a `.csv`-file at the given `path`
-    ///
+    /// TODO: move to rave.rs
     /// # Errors
     /// Returns an error if the path could not be written to
     pub fn dump_local_rave(&self, path: &str) -> Result<(), std::io::Error> {
@@ -229,7 +179,7 @@ impl Heuristics {
                 let place = Move::from_str(row[1])?;
                 let visits = row[2].parse().expect("load_rave: could not parse visits");
                 let total = row[3].parse().expect("load_rave: could not parse total");
-                Ok(((turn, place), RaveValue::new_with_data(visits, total)))
+                Ok(((turn, place), rave::Value::new_with_data(visits, total)))
             })
             .collect();
         let map = map.expect("Error loading Rave: Could not parse file to HashMap");
@@ -254,11 +204,29 @@ impl Heuristics {
             self.exploration_variables[turn]
         }
     }
+
+    #[must_use]
+    pub fn get_special_cost(&self, turn: usize, mv: &Move) -> f64 {
+        if let Move::Place(placement) = mv {
+            if turn < 7 && 8 < placement.piece && placement.piece < 15 {
+                self.special_cost[turn - 1]
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        }
+    }
+
+    #[must_use]
+    pub fn get_nn_cost(&self, board: &Board, mv: &Move) -> f64 {
+        self.move_evaluation_nn.predict(board, mv) as f64
+    }
 }
 
 impl Default for Heuristics {
-    fn default() -> Heuristics {
-        Heuristics::new([
+    fn default() -> Self {
+        Self::new([
             [1.5; 7],
             [9.0, 8.0, 6.0, 1.0, 0.0, 0.0, 0.0],
             [0.9, 0.8, 0.7, 0.6, 0.4, 0.2, 0.0],

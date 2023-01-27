@@ -1,5 +1,7 @@
 use super::board::placement::Placement;
-use super::board::Board;
+use crate::board::Board;
+use crate::pieces::Piece;
+use rand_xoshiro::SplitMix64;
 use serde::Serialize;
 use serde_with::serde_as;
 
@@ -12,7 +14,8 @@ use roll::Roll;
 use crate::console_log;
 
 use rand::seq::SliceRandom;
-use rand::thread_rng;
+use rand::Rng;
+use rand::SeedableRng;
 
 // #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 
@@ -34,6 +37,9 @@ pub struct Game {
     #[serde(rename = "specialPlaced")]
     pub special_placed: Option<u8>,
     pub board: Board,
+    available_moves: Option<Vec<Move>>,
+    #[serde(skip)]
+    rng: SplitMix64,
 }
 
 impl Game {
@@ -42,6 +48,16 @@ impl Game {
         let mut new = Self::default();
         new.roll();
         new
+    }
+
+    #[must_use]
+    pub fn new_from_seed(seed: [u8; 8]) -> Self {
+        let mut game = Game {
+            rng: SplitMix64::from_seed(seed),
+            ..Default::default()
+        };
+        game.roll();
+        game
     }
 
     fn can_play_specials(&self) -> bool {
@@ -90,23 +106,32 @@ impl Game {
     #[must_use]
     /// # Panics
     /// Should not panic ... I just haven't gotten around to ensure the code itself assert that
-    pub fn generate_roll() -> Roll {
+    pub fn generate_roll(&mut self) -> Roll {
         static COMMON: [u8; 6] = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06];
         static TRANSITIONAL: [u8; 3] = [0x07, 0x08, 0x09];
-        let mut rng = thread_rng();
+        // let mut rng = thread_rng();
 
         let mut roll = [
-            *COMMON.choose(&mut rng).unwrap(),
-            *COMMON.choose(&mut rng).unwrap(),
-            *COMMON.choose(&mut rng).unwrap(),
-            *TRANSITIONAL.choose(&mut rng).unwrap(),
+            *COMMON.choose(&mut self.rng).unwrap(),
+            *COMMON.choose(&mut self.rng).unwrap(),
+            *COMMON.choose(&mut self.rng).unwrap(),
+            *TRANSITIONAL.choose(&mut self.rng).unwrap(),
         ];
         roll.sort_unstable();
         Roll(roll)
     }
 
+    /// Roll the dice and set the game state to the new roll
+    /// # Panics
+    /// Panics if there are pieces left to place
     pub fn roll(&mut self) -> &Vec<u8> {
-        let roll = Self::generate_roll();
+        if self.generate_moves().iter().any(|mv| match mv {
+            Move::Place(placement) => !Piece::is_optional(placement.piece),
+            _ => false,
+        }) {
+            panic!("Cannot roll when there are pieces to place");
+        }
+        let roll = self.generate_roll();
         self.set_roll(roll);
         &self.to_place
     }
@@ -121,7 +146,12 @@ impl Game {
     /// If there are no moves for the remaining rolled pieces, `Move::Roll` is added to the list.
     /// If we can play specials in this turn, specials are added to the list
     #[must_use]
-    pub fn generate_moves(&self) -> Vec<Move> {
+    pub fn generate_moves(&mut self) -> Vec<Move> {
+        match &self.available_moves {
+            Some(moves) => return moves.clone(),
+            None => (),
+        }
+
         if self.ended {
             return vec![];
         }
@@ -150,11 +180,15 @@ impl Game {
             );
         }
 
+        self.available_moves = Some(moves.clone());
+
         moves
     }
 
+    /// Play a move
+    /// TODO: Change return value to Result
     pub fn do_move(&mut self, mv: Move) -> Option<String> {
-        match mv {
+        let result = match mv {
             Move::Place(placement) => self.place(placement).err(),
             Move::SetRoll(roll) => {
                 if self.turn >= 7 {
@@ -176,7 +210,9 @@ impl Game {
                 self.ended = true;
                 None
             }
-        }
+        };
+        self.available_moves = None;
+        result
     }
 
     /// Decode a string of the complete game state.
@@ -232,13 +268,17 @@ impl Game {
         console_log!("{}", board);
         let board = Board::decode(&String::from(board));
 
-        Ok(Game {
+        let rng = SplitMix64::from_seed(rand::thread_rng().gen());
+
+        Ok(Self {
             turn,
             to_place,
             expended_specials,
             board,
             special_placed,
             ended: false,
+            available_moves: None,
+            rng,
         })
     }
 
@@ -267,23 +307,35 @@ impl Game {
 
         let board = self.board.encode();
 
-        format!(
-            "{}|{}|{}|{}|{}",
-            turn, to_place, expended_specials, special_placed, board
-        )
+        format!("{turn}|{to_place}|{expended_specials}|{special_placed}|{board}")
     }
 }
 
 impl Default for Game {
     fn default() -> Self {
-        Game {
+        let rng = SplitMix64::from_seed(rand::thread_rng().gen());
+
+        Self {
             board: Board::new(),
             turn: 0,
             to_place: vec![],
             expended_specials: [None; 3],
             special_placed: None,
             ended: false,
+            available_moves: None,
+            rng,
         }
+    }
+}
+
+impl PartialEq for Game {
+    fn eq(&self, other: &Self) -> bool {
+        self.turn == other.turn
+            && self.to_place == other.to_place
+            && self.expended_specials == other.expended_specials
+            && self.board == other.board
+            && self.special_placed == other.special_placed
+            && self.ended == other.ended
     }
 }
 
@@ -302,7 +354,7 @@ mod test {
     #[test]
     fn test_game_encoding() {
         let mut game = Game::new();
-        let mut rng = thread_rng();
+        let mut rng = rand::thread_rng();
 
         while !game.ended {
             let mv = *game.generate_moves().choose(&mut rng).unwrap();
@@ -315,9 +367,17 @@ mod test {
     }
 
     #[test]
+    #[should_panic]
+    fn test_panic_on_invalid_roll() {
+        let mut game = Game::default();
+        game.roll();
+        game.do_move(Move::Roll);
+    }
+
+    #[test]
     fn test_game_turns() {
         let mut game = Game::new();
-        let mut rng = thread_rng();
+        let mut rng = rand::thread_rng();
         let mut current_turn = 1;
         let mut placed_pieces = 0;
         while !game.ended {
@@ -335,5 +395,21 @@ mod test {
             placed_pieces,
             7 * 4 + game.expended_specials.iter().flatten().count()
         );
+    }
+
+    #[test]
+    fn test_seeded_game_is_deterministic() {
+        let mut rng = rand::thread_rng();
+        let seed = rng.gen();
+        let mut game_a = Game::new_from_seed(seed);
+        let mut game_b = Game::new_from_seed(seed);
+        assert_eq!(game_a.to_place, game_b.to_place);
+
+        while !game_a.ended {
+            let mv = *game_a.generate_moves().choose(&mut rng).unwrap();
+            game_a.do_move(mv);
+            game_b.do_move(mv);
+            assert_eq!(game_a.to_place, game_b.to_place);
+        }
     }
 }

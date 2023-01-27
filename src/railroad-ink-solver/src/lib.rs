@@ -1,8 +1,8 @@
 #![warn(
-    // clippy::all,
+    clippy::all,
     // clippy::restriction,
     clippy::pedantic,
-    clippy::nursery,
+    // clippy::nursery,
     clippy::cargo
 )]
 #![allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
@@ -13,7 +13,7 @@ pub mod game;
 mod identity_hasher;
 pub mod mcts;
 mod pieces;
-mod utils;
+pub mod utils;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.

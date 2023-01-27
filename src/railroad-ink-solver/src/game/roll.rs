@@ -16,12 +16,12 @@ impl Roll {
 }
 
 impl From<&Roll> for u32 {
-    fn from(roll: &Roll) -> u32 {
+    fn from(roll: &Roll) -> Self {
         let roll = roll.0;
-        let a = u32::from(roll[0]);
-        let b = u32::from(roll[1]) << 8;
-        let c = u32::from(roll[2]) << 16;
-        let d = u32::from(roll[3]) << 24;
+        let a = Self::from(roll[0]);
+        let b = Self::from(roll[1]) << 8;
+        let c = Self::from(roll[2]) << 16;
+        let d = Self::from(roll[3]) << 24;
         a ^ b ^ c ^ d
     }
 }

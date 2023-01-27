@@ -22,3 +22,9 @@ extern "C" {
 macro_rules! console_log {
     ($($t:tt)*) => (println!("{}", &format_args!($($t)*).to_string()))
 }
+
+#[macro_export]
+#[cfg(target_family = "wasm")]
+macro_rules! console_log {
+    ($($t:tt)*) => ($crate::utils::log(&format_args!($($t)*).to_string()))
+}

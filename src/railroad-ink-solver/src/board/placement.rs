@@ -15,10 +15,10 @@ pub struct Placement {
 }
 
 impl From<&Placement> for u32 {
-    fn from(placement: &Placement) -> u32 {
-        let square = u32::from(placement.square.raw);
-        let piece = u32::from(placement.piece) << 8;
-        let orientation = u32::from(u8::from(&placement.orientation)) << 16;
+    fn from(placement: &Placement) -> Self {
+        let square = Self::from(placement.square.raw);
+        let piece = Self::from(placement.piece) << 8;
+        let orientation = Self::from(u8::from(&placement.orientation)) << 16;
         square ^ piece ^ orientation
     }
 }
@@ -42,7 +42,7 @@ impl Default for Placement {
 
 impl FromStr for Placement {
     type Err = ();
-    fn from_str(input: &str) -> Result<Placement, Self::Err> {
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
         let input: Vec<char> = input.chars().collect();
         let x = input.first().ok_or(())?.to_string();
         let x = x.parse::<u8>().expect("Could not parse Placement Square X");
@@ -65,7 +65,7 @@ impl FromStr for Placement {
             _ => panic!("Could not parse Placement Orientation"),
         };
 
-        Ok(Placement {
+        Ok(Self {
             square,
             piece,
             orientation,
@@ -81,12 +81,11 @@ impl Placement {
 
     #[must_use]
     pub fn get_connections_in_network(&self, index: u8) -> Vec<(Direction, Connection)> {
-        match self.get_networks()[index as usize] {
-            None => vec![],
-            Some(connections) => Direction::iter()
-                .map(|dir| (dir, connections[dir as usize]))
-                .collect(),
-        }
+        self.get_networks()[index as usize].map_or(vec![], |connection| {
+            Direction::iter()
+                .map(|dir| (dir, connection[dir as usize]))
+                .collect()
+        })
     }
 
     #[must_use]
@@ -126,13 +125,13 @@ pub struct Orientation {
 
 impl Orientation {
     #[must_use]
-    pub fn new(rotation: u8, flip: bool) -> Self {
+    pub const fn new(rotation: u8, flip: bool) -> Self {
         Self { rotation, flip }
     }
 }
 
 impl From<&Orientation> for u8 {
-    fn from(o: &Orientation) -> u8 {
+    fn from(o: &Orientation) -> Self {
         o.rotation + if o.flip { 4 } else { 0 }
     }
 }

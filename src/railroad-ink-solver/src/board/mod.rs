@@ -20,7 +20,7 @@ use super::pieces::{
 pub mod square;
 use square::Square;
 
-const BOARD_SIZE: u8 = 7;
+pub const BOARD_SIZE: u8 = 7;
 
 use serde::Serialize;
 use serde_with::serde_as; // 1.5.1
@@ -63,14 +63,14 @@ impl Board {
     ];
 
     #[must_use]
-    pub fn new() -> Board {
+    pub fn new() -> Self {
         let mut frontier = HashMap::with_hasher(BuildHasher);
 
-        for (loc, connect) in Board::EXITS {
+        for (loc, connect) in Self::EXITS {
             frontier.insert(loc, vec![connect]);
         }
 
-        Board {
+        Self {
             placements: [None; (BOARD_SIZE as usize).pow(2)],
             placed: vec![],
             frontier,
@@ -111,7 +111,7 @@ impl Board {
     /// # Panics
     /// Panics if the encoding is bad
     pub fn decode(string: &str) -> Self {
-        let mut board = Board::new();
+        let mut board = Self::new();
         for chunk in string.chars().collect::<Vec<char>>().as_slice().chunks(5) {
             let x = chunk[0].to_digit(10).unwrap_or_else(|| {
                 panic!(
@@ -220,9 +220,9 @@ impl Board {
                         && Direction::iter()
                             .map(|dir| (dir, piece.connection(dir)))
                             .filter(|(_, connection)| connection != &Connection::None)
-                            .all(
-                                |(dir, con)| match self.get(Self::get_neighbor(square, dir)) {
-                                    None => !{
+                            .all(|(dir, con)| {
+                                self.get(Self::get_neighbor(square, dir)).map_or_else(
+                                    || !{
                                         square.is_border() && {
                                             Self::EXITS.iter().any(
                                                 |(exit_square, (exit_dir, exit_con))| {
@@ -236,12 +236,12 @@ impl Board {
                                             )
                                         }
                                     },
-                                    Some(place) => match place.connection(dir.inverse()) {
+                                    |place| match place.connection(dir.inverse()) {
                                         Connection::None => true,
                                         connection => connection == con,
                                     },
-                                },
-                            );
+                                )
+                            });
 
                     if is_valid {
                         valid.push(Placement {
@@ -408,11 +408,11 @@ impl Board {
         let open_end_score = i32::try_from(open_end_score).unwrap_or(i32::MAX);
 
         #[rustfmt::skip]
-    let center_tiles: [(u8, u8); 9] = [
-      (2, 2), (3, 2), (4, 2),
-      (2, 3), (3, 3), (4, 3),
-      (2, 4), (3, 4), (4, 4),
-    ];
+        let center_tiles: [(u8, u8); 9] = [
+            (2, 2), (3, 2), (4, 2),
+            (2, 3), (3, 3), (4, 3),
+            (2, 4), (3, 4), (4, 4),
+        ];
 
         let center_tile_score = center_tiles
             .iter()
@@ -462,16 +462,18 @@ impl Board {
         }
         longest.unwrap_or_default()
     }
-    /**
-     * First, find all connections to current node,
-     * Filter visited connections
-     *   If no unvisited connections, return depth,
-     *   Else
-     *     add self to visited
-     *     For each connected node,
-     *       get dept by recursively run `depth_first_find_longest`
-     *     next, remove self from visited, and
-     *     return largest */
+
+    /// Get all connected nodes of same type
+    ///
+    /// First, find all connections to current node,
+    /// Filter visited connections
+    ///   If no unvisited connections, return depth,
+    ///   Else
+    ///     add self to visited
+    ///     For each connected node,
+    ///       get dept by recursively run `depth_first_find_longest`
+    ///     next, remove self from visited, and
+    ///     return largest
     fn depth_first_find_longest(
         &self,
         node: Square<BOARD_SIZE>,
@@ -514,30 +516,28 @@ impl Board {
         square: Square<BOARD_SIZE>,
         connection: Connection,
     ) -> Vec<Square<BOARD_SIZE>> {
-        match self.get(square) {
-            None => vec![],
-            Some(place) => Direction::iter()
+        self.get(square).map_or(vec![], |place| {
+            Direction::iter()
                 .filter(|&direction| place.has_connection(direction, connection))
                 .map(|direction| (direction, Self::get_neighbor(square, direction)))
-                .filter_map(|(direction, square)| match self.get(square) {
-                    None => None,
-                    Some(neighbor) => {
+                .filter_map(|(direction, square)| {
+                    self.get(square).map_or(None, |neighbor| {
                         if neighbor.has_connection(direction.inverse(), connection) {
                             Some(neighbor.square)
                         } else {
                             None
                         }
-                    }
+                    })
                 })
-                .collect(),
-        }
+                .collect()
+        })
     }
 
     /// Find end nodes. We use this later for finding longest paths.
     /// Three ways for a tile to be an end node:
     ///  1. it has an open ending
     ///  2. it's connected to the edge of the map
-    ///  3. it's a transition tile */
+    ///  3. it's a transition tile
     fn get_end_nodes(&self) -> HashSet<Square<BOARD_SIZE>> {
         // Find placements with open connections (always lay opposite to frontier)
         let mut end_nodes = self
@@ -629,6 +629,12 @@ impl<const S: u8> Index<&Square<S>> for Board {
 impl<const S: u8> IndexMut<&Square<S>> for Board {
     fn index_mut(&mut self, square: &Square<S>) -> &mut Option<Placement> {
         &mut self.placements[square.raw as usize]
+    }
+}
+
+impl PartialEq for Board {
+    fn eq(&self, other: &Self) -> bool {
+        self.placements == other.placements
     }
 }
 

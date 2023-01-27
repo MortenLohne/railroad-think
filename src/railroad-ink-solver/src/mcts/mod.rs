@@ -1,7 +1,9 @@
-use ord_subset::OrdSubsetIterExt;
-
 use crate::board::placement::Placement;
 use crate::game::{mv::Move, roll::Roll, Game};
+use ord_subset::OrdSubsetIterExt;
+use rand::{RngCore, SeedableRng};
+
+use rand_xoshiro::SplitMix64;
 use std::convert::TryInto;
 pub mod heuristics;
 pub mod trainer;
@@ -39,7 +41,7 @@ impl Node {
     }
 
     /// Expand the list of children to this node, but don't visit
-    pub fn generate_children(&mut self, game: &Game) {
+    pub fn generate_children(&mut self, game: &mut Game) {
         self.children = game
             .generate_moves()
             .into_iter()
@@ -100,10 +102,15 @@ impl Edge {
     ///
     /// # Panics
     /// Panics if no legal moves could be selected from game position
-    pub fn select(&mut self, mut game: Game, heuristics: &mut Heuristics) -> Score {
+    pub fn select(
+        &mut self,
+        mut game: Game,
+        heuristics: &mut Heuristics,
+        rng: &mut dyn RngCore,
+    ) -> Score {
         // Expand and rollout
         if self.visits == 0 {
-            return self.expand(game, heuristics);
+            return self.expand(game, heuristics, rng);
         }
         let mut generate_children = self.visits == 1 || game.turn == 0;
 
@@ -113,7 +120,7 @@ impl Edge {
                 debug_assert_eq!(self.mv, Move::Roll);
                 // If edge Move is `Roll`, we don't get to choose which roll
                 // to search. We have to actually roll the dice.
-                let roll = Game::generate_roll();
+                let roll = game.generate_roll();
                 if let Some(child) = nodes.get_mut(&roll) {
                     child
                 } else {
@@ -126,7 +133,7 @@ impl Edge {
             Single(node) => node,
         };
         if generate_children {
-            node.generate_children(&game);
+            node.generate_children(&mut game);
         }
         if node.is_terminal {
             // Increment `visits`. But don't change `self.mean`: it's the same, still
@@ -149,9 +156,10 @@ impl Edge {
         }
 
         let child_edge = node.children.get_mut(best_child_node_index).unwrap();
+
         game.do_move(child_edge.mv);
         let turn = game.turn;
-        let result = child_edge.select(game, heuristics);
+        let result = child_edge.select(game, heuristics, rng);
 
         // Backpropagate
         self.visits += 1;
@@ -175,21 +183,18 @@ impl Edge {
             Score::sqrt(Score::ln(parent_visits as f64 / self.visits as f64))
         };
 
-        let mut exploration_term = exploration_bias * exploration;
+        let exploration_term = exploration_bias * exploration;
 
-        if let Move::Place(placement) = self.mv {
-            if turn < 7 && 8 < placement.piece && placement.piece < 15 {
-                exploration_term -= heuristics.special_cost[turn as usize];
-            }
-        }
+        let exploration_term =
+            exploration_term - heuristics.get_special_cost(turn as usize, &self.mv);
 
         if heuristics.use_rave {
             let k = 1.;
             let rave = heuristics.get_rave(turn, &self.mv);
             let rave = rave + heuristics.rave_exploration_bias;
             let n = self.visits as f64;
-            let beta = (k / (3. * n + k)).sqrt();
-            let q = (1.0 - beta) * ucb + beta * rave;
+            let beta = (k / 3.0f64.mul_add(n, k)).sqrt();
+            let q = (1.0 - beta).mul_add(ucb, beta * rave);
 
             q + exploration_term
         } else {
@@ -197,18 +202,18 @@ impl Edge {
         }
     }
 
-    fn expand(&mut self, game: Game, heuristics: &mut Heuristics) -> Score {
+    fn expand(&mut self, game: Game, heuristics: &mut Heuristics, rng: &mut dyn RngCore) -> Score {
         debug_assert!(self.child.is_none());
 
         if self.mv == Move::Roll {
             self.visits = 1;
             let nodes: HashMap<Roll, Node, BuildHasher> = HashMap::with_hasher(BuildHasher);
             self.child = Some(Multiple(nodes));
-            let (score, _) = Self::rollout(game, heuristics, 0);
+            let (score, _) = Self::rollout(game, heuristics, 0, rng);
             score
         } else {
             let mut child = Node::new();
-            let (score, is_terminal) = Self::rollout(game, heuristics, 0);
+            let (score, is_terminal) = Self::rollout(game, heuristics, 0, rng);
             self.visits = 1;
             self.mean_score = score;
             child.total_score = score;
@@ -220,12 +225,16 @@ impl Edge {
 
     /// Does random moves until `game.ended`
     /// Returns `(score, depth_zero_is_terminal)`
-    fn rollout(mut game: Game, heuristics: &mut Heuristics, depth: u16) -> (Score, bool) {
+    fn rollout(
+        mut game: Game,
+        heuristics: &mut Heuristics,
+        depth: u16,
+        rng: &mut dyn RngCore,
+    ) -> (Score, bool) {
         if game.ended {
             return (f64::from(game.board.score()), depth == 0);
         }
 
-        let mut rng = rand::thread_rng();
         let moves = game.generate_moves();
 
         let mv = if heuristics.use_rave {
@@ -239,13 +248,15 @@ impl Edge {
                 })
             }
         } else {
-            moves.choose(&mut rng).copied()
+            // TODO: use a better heuristic
+            moves.choose(rng).copied()
         };
 
         let mv = mv.expect("Rollout failed to find a valid move");
+
         game.do_move(mv);
         let turn = game.turn;
-        let (score, is_terminal) = Self::rollout(game, heuristics, depth + 1);
+        let (score, is_terminal) = Self::rollout(game, heuristics, depth + 1, rng);
         heuristics.update_rave(turn, &mv, score);
 
         (score, is_terminal)
@@ -254,7 +265,7 @@ impl Edge {
 
 impl Default for Edge {
     fn default() -> Self {
-        Edge::new(Move::Place(Placement::default()))
+        Self::new(Move::Place(Placement::default()))
     }
 }
 
@@ -262,6 +273,7 @@ pub struct MonteCarloTree {
     game: Game,
     pub root: Edge,
     pub heuristics: Heuristics,
+    seed: [u8; 8],
 }
 
 impl MonteCarloTree {
@@ -269,19 +281,37 @@ impl MonteCarloTree {
     pub fn new(game: Game) -> Self {
         let root = Edge::default();
         let heuristics = Heuristics::default();
+        let seed: [u8; 8] = rand::thread_rng().gen();
+
         Self {
             game,
             root,
             heuristics,
+            seed,
+        }
+    }
+
+    #[must_use]
+    pub fn new_from_seed(game: Game, seed: [u8; 8]) -> Self {
+        let root = Edge::default();
+        let heuristics = Heuristics::default();
+
+        Self {
+            game,
+            root,
+            heuristics,
+            seed,
         }
     }
 
     #[must_use]
     pub fn new_with_heuristics(game: Game, heuristics: Heuristics) -> Self {
+        let seed: [u8; 8] = rand::thread_rng().gen();
         Self {
             game,
             heuristics,
             root: Edge::default(),
+            seed,
         }
     }
     /// # Panics
@@ -364,10 +394,14 @@ impl MonteCarloTree {
     /// faster, maybe just revert.
     /// Although, having undo-capabilities would be nice for frontend ...
     pub fn search(&mut self) {
-        self.root.select(self.game.clone(), &mut self.heuristics);
+        self.seed = SplitMix64::from_seed(self.seed).gen();
+        let mut rng = SplitMix64::from_seed(self.seed);
+
+        self.root
+            .select(self.game.clone(), &mut self.heuristics, &mut rng);
     }
 
-    pub fn search_iterations(&mut self, iterations: u64) -> &Self {
+    pub fn search_iterations(&mut self, iterations: u64) -> &mut Self {
         for _ in 0..iterations {
             self.search();
         }
@@ -378,7 +412,6 @@ impl MonteCarloTree {
         let start = std::time::Instant::now();
         while start.elapsed().as_millis() < milliseconds {
             self.search();
-            // println!("{:?}", self.root.mv);
         }
     }
 
@@ -386,7 +419,7 @@ impl MonteCarloTree {
     /// # Panics
     /// Panics if no move could be selected from the current game position.
     #[must_use]
-    pub fn best_move(&self) -> Move {
+    pub fn best_move(&mut self) -> Move {
         match self.root.child.as_ref() {
             None => *self
                 .game
@@ -430,9 +463,16 @@ mod test {
     }
 
     #[test]
+    fn test_bugged_board() {
+        let bugged = "6|02040509|0F0C0A||5A0823G0F15B0101A0406B0315G0805F0223A0104F0313F0112A0434G0711G0416D0C06F0700F0316C0421F0314A0136E0512G0A06G0602F092";
+        let game = Game::decode(bugged);
+        let mut tree = MonteCarloTree::new(game.unwrap());
+        tree.search_iterations(10000);
+    }
+
+    #[test]
     fn test_many_iteration_search() {
-        let mut game = Game::new();
-        game.roll();
+        let game = Game::new();
         let mut mcts = MonteCarloTree::new(game);
         mcts.search_iterations(100);
     }
@@ -440,7 +480,6 @@ mod test {
     #[test]
     fn test_play_full_game() {
         let mut game = Game::new();
-        game.roll();
         let mut mcts = MonteCarloTree::new(game.clone());
         while !game.ended {
             mcts.search_iterations(100);
@@ -455,12 +494,48 @@ mod test {
     #[test]
     fn test_play_full_game_duration() {
         let mut game = Game::new();
-        game.roll();
         let mut mcts = MonteCarloTree::new(game.clone());
         while !game.ended {
             mcts.search_duration(200);
             let mv = mcts.best_move();
             mcts = MonteCarloTree::progress(mcts, mv, &mut game);
         }
+    }
+
+    #[test]
+    fn test_seeded_mcts_is_deterministic() {
+        let seed = [0; 8];
+
+        let mut game_a = Game::new_from_seed(seed);
+        let mut mcts_a = MonteCarloTree::new_from_seed(game_a.clone(), seed);
+
+        while !game_a.ended {
+            mcts_a.search_iterations(10);
+            let mv = mcts_a.best_move();
+            mcts_a = MonteCarloTree::progress(mcts_a, mv, &mut game_a);
+        }
+
+        let mut game_b = Game::new_from_seed(seed);
+        let mut mcts_b = MonteCarloTree::new_from_seed(game_b.clone(), seed);
+
+        while !game_b.ended {
+            mcts_b.search_iterations(10);
+            let mv = mcts_b.best_move();
+            mcts_b = MonteCarloTree::progress(mcts_b, mv, &mut game_b);
+        }
+
+        assert_eq!(game_a, game_b);
+
+        let mut game_c = Game::new_from_seed(seed);
+        let seed = [1; 8];
+        let mut mcts_c = MonteCarloTree::new_from_seed(game_c.clone(), seed);
+
+        while !game_c.ended {
+            mcts_c.search_iterations(10);
+            let mv = mcts_c.best_move();
+            mcts_c = MonteCarloTree::progress(mcts_c, mv, &mut game_c);
+        }
+
+        assert_ne!(game_a, game_c);
     }
 }

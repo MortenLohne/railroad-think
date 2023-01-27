@@ -23,7 +23,7 @@ impl GameController {
     pub fn new() -> Self {
         set_panic_hook();
 
-        GameController {
+        Self {
             game: Game::default(),
             mcts: None,
         }

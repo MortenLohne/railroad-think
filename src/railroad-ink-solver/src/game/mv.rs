@@ -26,7 +26,7 @@ impl PartialEq for Move {
         match (self, rhs) {
             (Place(a), Place(b)) => a == b,
             (SetRoll(a), SetRoll(b)) => a == b,
-            (Move::Roll, Move::Roll) | (Move::End, Move::End) => true,
+            (Self::Roll, Self::Roll) | (Self::End, Self::End) => true,
             _ => false,
         }
     }
@@ -35,10 +35,10 @@ impl PartialEq for Move {
 impl Hash for Move {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let base = match self {
-            Move::End => 0,
-            Move::Roll => 1,
-            Move::Place(placement) => (u32::from(placement) << 2) + 2,
-            Move::SetRoll(roll) => (u32::from(roll) << 2) + 3,
+            Self::End => 0,
+            Self::Roll => 1,
+            Self::Place(placement) => (u32::from(placement) << 2) + 2,
+            Self::SetRoll(roll) => (u32::from(roll) << 2) + 3,
         };
         base.hash(state);
     }
@@ -52,10 +52,10 @@ impl Display for Move {
 
 impl FromStr for Move {
     type Err = ();
-    fn from_str(input: &str) -> Result<Move, Self::Err> {
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
         match input {
-            "Roll" => Ok(Move::Roll),
-            "End" => Ok(Move::End),
+            "Roll" => Ok(Self::Roll),
+            "End" => Ok(Self::End),
             _ if input.starts_with("SetRoll") => {
                 let payload = String::from(input)[9..input.len() - 2].to_string();
                 let integers: Vec<u8> = payload
@@ -77,14 +77,14 @@ impl FromStr for Move {
                     )
                 });
 
-                Ok(Move::SetRoll(Roll(*integers)))
+                Ok(Self::SetRoll(Roll(*integers)))
             }
             _ if input.starts_with("Place") => {
                 let payload = String::from(input)[6..input.len() - 1].to_string();
                 let placement = Placement::from_str(payload.as_str()).unwrap_or_else(|_| {
                     panic!("Move::Place Placement parse failed. Got {}", payload)
                 });
-                Ok(Move::Place(placement))
+                Ok(Self::Place(placement))
             }
             _ => Err(()),
         }

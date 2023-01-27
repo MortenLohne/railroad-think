@@ -13,7 +13,7 @@ use Direction::{East, North, South, West};
 
 impl Direction {
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub const fn inverse(&self) -> Self {
         match self {
             North => South,
             East => West,

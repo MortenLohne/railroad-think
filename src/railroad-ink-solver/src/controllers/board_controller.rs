@@ -21,7 +21,7 @@ impl BoardController {
     pub fn new() -> Self {
         set_panic_hook();
 
-        BoardController {
+        Self {
             board: Board::new(),
         }
     }

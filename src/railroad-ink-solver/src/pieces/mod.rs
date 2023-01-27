@@ -11,14 +11,7 @@ pub enum Connection {
     None,
 }
 use super::board::placement::Orientation;
-// use super::board::utils::Square;
 use Connection::{None, Rail, Road};
-
-// #[derive(Clone, Copy)]
-// pub struct Permutation {
-//   pub rotation: u8,
-//   pub flip: bool,
-// }
 
 // IDEA:
 // |  networks is a list of connections indexed
@@ -66,11 +59,14 @@ impl Piece {
         self
     }
 
+    pub fn is_optional(piece: u8) -> bool {
+        piece >= 0x0a
+    }
+
     pub fn get_networks(piece: u8, orientation: Orientation) -> [Option<[Connection; 4]>; 2] {
-        match get_piece(piece) {
-            Option::None => [Option::None, Option::None],
-            Some(piece) => piece.permute(orientation).networks,
-        }
+        get_piece(piece).map_or([Option::None, Option::None], |piece| {
+            piece.permute(orientation).networks
+        })
     }
 }
 
@@ -97,7 +93,7 @@ impl Connected for Piece {
     }
 }
 
-pub fn get_piece(id: u8) -> Option<Piece> {
+pub const fn get_piece(id: u8) -> Option<Piece> {
     match id {
         0x01 => Some(Piece {
             // L rail

@@ -20,36 +20,36 @@ impl<const S: u8> Square<S> {
     }
 
     #[must_use]
-    pub fn out_of_bounds(&self) -> bool {
+    pub const fn out_of_bounds(&self) -> bool {
         self.raw > S * S
     }
 
     #[must_use]
-    pub fn x(&self) -> u8 {
+    pub const fn x(&self) -> u8 {
         self.raw % S
     }
 
     #[must_use]
-    pub fn y(&self) -> u8 {
+    pub const fn y(&self) -> u8 {
         self.raw / S
     }
 
     #[must_use]
-    pub fn adjacent(&self) -> [Square<S>; 4] {
+    pub const fn adjacent(&self) -> [Self; 4] {
         let north = self.raw.wrapping_sub(S);
         let east = self.raw.saturating_add(1);
         let south = self.raw.saturating_add(S);
         let west = self.raw.wrapping_sub(1);
         [
-            Square { raw: north },
-            Square { raw: east },
-            Square { raw: south },
-            Square { raw: west },
+            Self { raw: north },
+            Self { raw: east },
+            Self { raw: south },
+            Self { raw: west },
         ]
     }
 
     #[must_use]
-    pub fn is_border(&self) -> bool {
+    pub const fn is_border(&self) -> bool {
         let x = self.x();
         let y = self.y();
         let s = S - 1;

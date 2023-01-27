@@ -7,3 +7,4 @@ pkg/
 wasm-pack.log
 benches/data
 src/mcts/heuristics/training
+log.txt
