@@ -109,8 +109,8 @@ button:hover {
 }
 
 button:active {
-  background-color: var(--info-tint-3);
-  border-color: var(--info);
+  background-color: var(--blue-tint-3);
+  border-color: var(--blue);
   color: var(--gray-shade-3);
 }
 

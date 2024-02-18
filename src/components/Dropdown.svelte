@@ -95,9 +95,9 @@ button {
 }
 
 div :global(mark) {
-  background-color: var(--info-tint-3);
+  background-color: var(--blue-tint-3);
   mix-blend-mode: multiply;
-  border: 1px solid var(--info-tint-2);
+  border: 1px solid var(--blue-tint-2);
   border-radius: 3px;
   color: var(--black);
   margin: 0 -2px;
@@ -106,7 +106,7 @@ div :global(mark) {
 
 button:hover,
 button:focus {
-  background-color: var(--info-tint-3);
+  background-color: var(--blue-tint-3);
 }
 
 svg {

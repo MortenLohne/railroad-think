@@ -130,7 +130,7 @@ core-datepicker :global(button[data-adjacent='true']) {
 
 core-datepicker :global(button[aria-current='date']) {
   /* Targets the current date (today) in month view */
-  color: var(--info);
+  color: var(--blue);
 }
 
 core-datepicker :global(td:nth-last-child(1) button),
@@ -146,23 +146,23 @@ core-datepicker :global(td:nth-last-child(2) button[data-adjacent='true']) {
 core-datepicker :global(td button[autofocus]) {
   /* Targets the chosen date in month view */
   color: var(--white);
-  --background-color: var(--info);
+  --background-color: var(--blue);
 }
 
 core-datepicker :global(td > button:hover) {
   color: var(--black);
-  --background-color: var(--info-tint-4);
-  --border-color: var(--info-tint-1);
+  --background-color: var(--blue-tint-4);
+  --border-color: var(--blue-tint-1);
 }
 
 core-datepicker :global(button[autofocus]:hover) {
   color: var(--white);
-  --background-color: var(--info-shade-1);
-  --border-color: var(--info-shade-1);
+  --background-color: var(--blue-shade-1);
+  --border-color: var(--blue-shade-1);
 }
 
 core-datepicker :global(button:focus-visible) {
-  outline: 2px solid var(--info);
+  outline: 2px solid var(--blue);
   outline-offset: 1px;
 }
 </style>

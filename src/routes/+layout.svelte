@@ -56,7 +56,7 @@ a:focus-visible {
 }
 
 main {
-  background-color: var(--blue-tint-4);
+  background-color: var(--blue-50);
   height: 100%;
   padding: var(--s-2);
   flex-grow: 1;

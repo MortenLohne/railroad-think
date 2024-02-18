@@ -33,8 +33,8 @@ button:not([disabled]):hover {
 
 button:not([disabled]):active {
   color: var(--gray-shade-3);
-  background-color: var(--info-tint-3);
-  border-color: var(--info);
+  background-color: var(--blue-tint-3);
+  border-color: var(--blue);
   transform: rotate(0) translateY(1px);
 }
 </style>

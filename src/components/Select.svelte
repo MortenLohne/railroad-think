@@ -166,7 +166,7 @@ input:disabled + img {
 }
 
 label:hover img {
-  border-color: var(--info);
+  border-color: var(--blue);
   opacity: 1;
 }
 
@@ -179,7 +179,7 @@ label:hover img {
 }
 
 .selected img {
-  border-color: var(--info);
+  border-color: var(--blue);
 }
 
 .selected-affordance {
@@ -194,7 +194,7 @@ label:hover img {
 
 .selected-affordance span:not(.null) {
   font-weight: 600;
-  background-color: var(--info);
+  background-color: var(--blue);
   padding: 1px var(--s-1) 2px;
   border-radius: var(--s-1);
   color: var(--white);

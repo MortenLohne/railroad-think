@@ -3,19 +3,16 @@ import {
   createGlobalTheme,
 } from '@vanilla-extract/css';
 
-import * as colors from './colors';
+import colors from './colors';
 
-// A better way would probably be to explicitly handle the typing here ...
-export const vars = {
-  ...(colors as any),
-};
-
-export const globalThemeContract = createGlobalThemeContract(vars, (_, path) =>
-  path.join('-').replace('-base', '')
+export const globalThemeContract = createGlobalThemeContract(
+  colors,
+  (_, path) => path.join('-').replace('-DEFAULT', '')
 );
 
 export const globalStyle = createGlobalTheme(
   '.railroad-think',
   globalThemeContract,
-  vars
+  // @ts-ignore I haven't figured out how to type this, but it works. :)
+  colors
 );
