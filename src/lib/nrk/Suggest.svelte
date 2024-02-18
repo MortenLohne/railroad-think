@@ -7,8 +7,8 @@
 import { browser } from '$app/env';
 import CoreSuggest from '@nrk/core-suggest';
 
-if (browser && customElements.get('b4-core-suggest') === undefined) {
-  window.customElements.define('b4-core-suggest', CoreSuggest);
+if (browser && customElements.get('core-suggest') === undefined) {
+  window.customElements.define('core-suggest', CoreSuggest);
 }
 </script>
 
@@ -47,6 +47,6 @@ $: if (suggest) suggest.highlight = highlight;
 $: if (suggest) suggest.hidden = hidden;
 </script>
 
-<b4-core-suggest use:init>
+<core-suggest use:init>
   <slot />
-</b4-core-suggest>
+</core-suggest>

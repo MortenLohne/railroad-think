@@ -7,8 +7,8 @@
 import { browser } from '$app/env';
 import CoreDatepicker from '@nrk/core-datepicker';
 
-if (browser && customElements.get('b4-core-datepicker') === undefined) {
-  window.customElements.define('b4-core-datepicker', CoreDatepicker);
+if (browser && customElements.get('core-datepicker') === undefined) {
+  window.customElements.define('core-datepicker', CoreDatepicker);
 }
 </script>
 
@@ -62,43 +62,43 @@ function init(datepicker) {
 </script>
 
 <div>
-  <b4-core-datepicker {date} {months} use:init>
+  <core-datepicker {date} {months} use:init>
     <slot />
-  </b4-core-datepicker>
+  </core-datepicker>
 </div>
 
 <style>
-b4-core-datepicker {
+core-datepicker {
   position: relative;
 }
 
-b4-core-datepicker :global(table) {
+core-datepicker :global(table) {
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
   text-align: center;
 }
 
-b4-core-datepicker :global(th) {
+core-datepicker :global(th) {
   color: var(--gray-shade-1);
   font-weight: normal;
   font-size: var(--small);
 }
 
-b4-core-datepicker :global(thead) {
+core-datepicker :global(thead) {
   border-bottom: 4px solid transparent;
 }
 
-b4-core-datepicker :global(td) {
+core-datepicker :global(td) {
   width: 0;
   position: relative;
 }
 
-b4-core-datepicker :global(caption) {
+core-datepicker :global(caption) {
   margin-bottom: var(--s-1);
 }
 
-b4-core-datepicker :global(td > button) {
+core-datepicker :global(td > button) {
   width: 100%;
   padding: 4px;
   cursor: pointer;
@@ -108,7 +108,7 @@ b4-core-datepicker :global(td > button) {
   --border-color: transparent;
 }
 
-b4-core-datepicker :global(td > button::after) {
+core-datepicker :global(td > button::after) {
   display: block;
   content: '';
   box-sizing: border-box;
@@ -124,44 +124,44 @@ b4-core-datepicker :global(td > button::after) {
   border-color: var(--border-color);
 }
 
-b4-core-datepicker :global(button[data-adjacent='true']) {
+core-datepicker :global(button[data-adjacent='true']) {
   color: var(--gray-tint-1);
 }
 
-b4-core-datepicker :global(button[aria-current='date']) {
+core-datepicker :global(button[aria-current='date']) {
   /* Targets the current date (today) in month view */
   color: var(--info);
 }
 
-b4-core-datepicker :global(td:nth-last-child(1) button),
-b4-core-datepicker :global(td:nth-last-child(2) button) {
+core-datepicker :global(td:nth-last-child(1) button),
+core-datepicker :global(td:nth-last-child(2) button) {
   color: var(--red);
 }
 
-b4-core-datepicker :global(td:nth-last-child(1) button[data-adjacent='true']),
-b4-core-datepicker :global(td:nth-last-child(2) button[data-adjacent='true']) {
+core-datepicker :global(td:nth-last-child(1) button[data-adjacent='true']),
+core-datepicker :global(td:nth-last-child(2) button[data-adjacent='true']) {
   color: var(--red-tint-2);
 }
 
-b4-core-datepicker :global(td button[autofocus]) {
+core-datepicker :global(td button[autofocus]) {
   /* Targets the chosen date in month view */
   color: var(--white);
   --background-color: var(--info);
 }
 
-b4-core-datepicker :global(td > button:hover) {
+core-datepicker :global(td > button:hover) {
   color: var(--black);
   --background-color: var(--info-tint-4);
   --border-color: var(--info-tint-1);
 }
 
-b4-core-datepicker :global(button[autofocus]:hover) {
+core-datepicker :global(button[autofocus]:hover) {
   color: var(--white);
   --background-color: var(--info-shade-1);
   --border-color: var(--info-shade-1);
 }
 
-b4-core-datepicker :global(button:focus-visible) {
+core-datepicker :global(button:focus-visible) {
   outline: 2px solid var(--info);
   outline-offset: 1px;
 }

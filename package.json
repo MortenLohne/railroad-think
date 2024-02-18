@@ -1,5 +1,5 @@
 {
-  "name": "b4-railroad-think",
+  "name": "railroad-think",
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
@@ -21,7 +21,6 @@
     "dev": "vite",
     "build": "vite build",
     "deploy": "yarn build && ./deploy.sh && bord4 integrate",
-    "stage": "B4_STAGE=true yarn build && ./deploy.sh --stage",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "lint": "prettier src --write --ignore-path .gitignore --cache src --loglevel silent",
     "purge": "curl -i -u \"purge:$PURGE_KEY\" -H \"Content-Type:application/json\" -X POST -d '{\"keys\": [\"railroad-think\"]}' https://cachepurge-api.schibsted.tech/purge/keys"

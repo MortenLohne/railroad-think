@@ -7,8 +7,8 @@
 import { browser } from '$app/env';
 import CoreToggle from '@nrk/core-toggle';
 
-if (browser && customElements.get('b4-core-toggle') === undefined) {
-  window.customElements.define('b4-core-toggle', CoreToggle);
+if (browser && customElements.get('core-toggle') === undefined) {
+  window.customElements.define('core-toggle', CoreToggle);
 }
 </script>
 
@@ -42,6 +42,6 @@ $: if (toggle) toggle.hidden = hidden;
 $: if (toggle) toggle.popup = popup;
 </script>
 
-<b4-core-toggle use:init>
+<core-toggle use:init>
   <slot />
-</b4-core-toggle>
+</core-toggle>

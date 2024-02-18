@@ -4,7 +4,7 @@
   box-sizing: border-box;
 }
 
-.b4-railroad-think {
+.railroad-think {
   font-family: var(--sans);
   font-size: var(--medium);
   text-rendering: optimizeLegibility;
@@ -12,7 +12,7 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-.b4-railroad-think button {
+.railroad-think button {
   cursor: pointer;
   text-align: inherit;
   font-family: inherit;
@@ -25,34 +25,34 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-.b4-railroad-think h1 {
+.railroad-think h1 {
   font-size: var(--xhuge);
   font-weight: 700;
 }
 
-.b4-railroad-think h2 {
+.railroad-think h2 {
   font-size: var(--huge);
   font-weight: 700;
 }
 
-.b4-railroad-think h3 {
+.railroad-think h3 {
   font-size: var(--large);
   font-weight: 700;
 }
 
-.b4-railroad-think h4 {
+.railroad-think h4 {
   font-size: var(--large);
   font-weight: normal;
 }
 
-.b4-railroad-think h5,
-.b4-railroad-think h6 {
+.railroad-think h5,
+.railroad-think h6 {
   font-size: var(--medium);
   font-weight: 700;
 }
 
-.b4-railroad-think pre,
-.b4-railroad-think code {
+.railroad-think pre,
+.railroad-think code {
   color: var(--gray-shade-3);
   background-color: var(--gray-tint-4);
   border: 1px solid var(--gray-tint-3);
@@ -63,14 +63,14 @@
   -webkit-box-decoration-break: clone;
 }
 
-.b4-railroad-think pre {
+.railroad-think pre {
   padding: var(--s-0-5);
 }
 
-.b4-railroad-think ul {
+.railroad-think ul {
   padding-left: 1em;
 }
 
-.b4-railroad-think a {
+.railroad-think a {
   color: var(--blue-shade-1);
 }

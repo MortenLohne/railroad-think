@@ -15,7 +15,7 @@ export const globalThemeContract = createGlobalThemeContract(vars, (_, path) =>
 );
 
 export const globalStyle = createGlobalTheme(
-  '.b4-railroad-think',
+  '.railroad-think',
   globalThemeContract,
   vars
 );

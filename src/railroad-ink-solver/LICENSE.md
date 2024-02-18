@@ -1,4 +1,4 @@
-Copyright (c) 2018 Havegum <halvard.alvheim.vegum@bt.no>
+Copyright (c) 2018 Havegum <halvard.vegum@gmail.com>
 
 Permission is hereby granted, free of charge, to any
 person obtaining a copy of this software and associated

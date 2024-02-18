@@ -7,8 +7,8 @@
 import { browser } from '$app/env';
 import CoreTabs from '@nrk/core-tabs';
 
-if (browser && customElements.get('b4-core-tabs') === undefined) {
-  window.customElements.define('b4-core-tabs', CoreTabs);
+if (browser && customElements.get('core-tabs') === undefined) {
+  window.customElements.define('core-tabs', CoreTabs);
 }
 </script>
 
@@ -32,8 +32,8 @@ function init(node) {
 $: if (tabsElement) tabsElement.tab = tab;
 </script>
 
-<b4-core-tabs use:init>
+<core-tabs use:init>
   <slot />
-</b4-core-tabs>
+</core-tabs>
 
 <slot name="panels" />

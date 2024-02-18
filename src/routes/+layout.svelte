@@ -67,7 +67,7 @@ main {
   min-height: 100%;
 }
 
-:global(.b4-railroad-think) {
+:global(.railroad-think) {
   display: flex;
   flex-direction: column;
   height: 100%;
