@@ -10,7 +10,6 @@
 //! Board => nn => Placement 1hot
 //!
 //! Value either by score or boolean (whether the move was chosen or not)
-#![cfg_attr(feature = "nightly", feature(generic_const_exprs))]
 
 use crate::{
     board::{self, placement::Placement, square::Square},
@@ -20,8 +19,7 @@ use crate::{
 use indicatif::ProgressBar;
 use std::{io::Read, time::Instant};
 
-use dfdx::{data::SubsetIterator, losses::mse_loss, optim::Adam, prelude::*};
-
+use dfdx::{data::IteratorBatchExt, losses::mse_loss, optim::Adam, prelude::*, tensor::Cpu};
 const MODEL_PATH: &str = "./src/mcts/heuristics/nn";
 
 // #[cfg(feature = "nightly")]
@@ -32,10 +30,22 @@ const MODEL_PATH: &str = "./src/mcts/heuristics/nn";
 
 // #[cfg(not(feature = "nightly"))]
 type Model = (
-    (Linear<588, 16>, ReLU),
+    Linear<588, 16>,
+    ReLU,
     // DropoutOneIn<2>,
-    (Linear<16, 16>, ReLU),
-    (Linear<16, 1>, ReLU),
+    Linear<16, 16>,
+    ReLU,
+    Linear<16, 1>,
+    ReLU,
+);
+
+type BuildModel = (
+    modules::Linear<588, 16, f32, Cpu>,
+    ReLU,
+    modules::Linear<16, 16, f32, Cpu>,
+    ReLU,
+    modules::Linear<16, 1, f32, Cpu>,
+    ReLU,
 );
 
 type Device = Cpu;
@@ -44,15 +54,15 @@ const BATCH_SIZE: usize = 1024;
 
 #[derive(Clone)]
 pub struct EdgeStrategy {
-    model: Model,
+    model: BuildModel,
     device: Device,
 }
 
 impl EdgeStrategy {
     #[must_use]
     pub fn create_model() -> Self {
-        let device: Cpu = dfdx::tensor::Cpu::default();
-        let mut model: Model = device.build_module();
+        let device: Cpu = Cpu::default();
+        let mut model = Model::build_on_device(&device);
         model.reset_params();
         Self { model, device }
     }
@@ -61,8 +71,8 @@ impl EdgeStrategy {
     /// If the model cannot be saved
     #[must_use]
     pub fn load(model_name: &str) -> Self {
-        let device: Cpu = dfdx::tensor::Cpu::default();
-        let mut model: Model = device.build_module();
+        let device: Cpu = Cpu::default();
+        let mut model = Model::build_on_device(&device);
         model
             .load(format!("{MODEL_PATH}/{model_name}.npz"))
             .expect("Could not load model");
@@ -72,11 +82,9 @@ impl EdgeStrategy {
 
     #[must_use]
     pub fn predict(&self, board: &board::Board, mv: &Move) -> f32 {
-        let v = self
-            .model
+        self.model
             .forward(Self::get_features(board, *mv, &self.device))
-            .array()[0];
-        v
+            .array()[0]
     }
 
     pub fn train_model(&mut self) {
@@ -86,12 +94,13 @@ impl EdgeStrategy {
     /// # Panics
     /// If the model cannot be saved
     pub fn train_model_path(&mut self, model_path: &str) {
-        let device: Cpu = dfdx::tensor::Cpu::default();
+        let device: Cpu = Cpu::default();
 
         let mut rng = rand::thread_rng();
 
-        let mut optimizer: Adam<Model, Cpu> = dfdx::optim::Adam::default();
-
+        let mut optimizer: Adam<BuildModel, f32, Cpu> =
+            dfdx::optim::Adam::new(&self.model, Default::default());
+        let mut grads = self.model.alloc_grads();
         let dataset = Dataset::load(&device);
 
         for i_epoch in 0..5000 {
@@ -100,20 +109,21 @@ impl EdgeStrategy {
             let start = Instant::now();
             let feature_count = dataset.features.len();
             let bar = ProgressBar::new(feature_count as u64);
-            let subsets = SubsetIterator::<BATCH_SIZE>::shuffled(feature_count, &mut rng);
+            let subsets = (0..feature_count).batch_exact(Const::<BATCH_SIZE>);
 
             for (features, labels) in
                 subsets.map(|indices| dataset.get_batch::<BATCH_SIZE>(&device, indices))
             {
-                let pred = self.model.forward_mut(features.traced());
+                let pred = self.model.forward_mut(features.trace(grads));
                 let loss = mse_loss(pred, labels.clone());
 
                 total_epoch_loss += loss.array();
                 num_batches += 1;
                 bar.inc(BATCH_SIZE as u64);
 
-                let gradients = loss.backward();
-                optimizer.update(&mut self.model, gradients).unwrap();
+                grads = loss.backward();
+                optimizer.update(&mut self.model, &grads).unwrap();
+                self.model.zero_grads(&mut grads);
             }
             let dur = start.elapsed();
             bar.finish_and_clear();
@@ -134,43 +144,47 @@ impl EdgeStrategy {
         }
     }
 
-    #[cfg(feature = "nightly")]
-    fn get_features(board: &board::Board, mv: Move, device: &Device) -> Tensor<Rank3<7, 7, 7>> {
-        let mut features = device.zeros();
-        let mut data = [0.0; 7 * 7 * 7];
-        for y in 0..board::BOARD_SIZE {
-            for x in 0..board::BOARD_SIZE {
-                let ft = board[&Square::<7>::new(x, y)]
-                    .map_or([0.0; 7], Self::get_features_for_placement);
-                let x = x as usize;
-                let y = y as usize;
-                for i in 0..ft.len() {
-                    data[y * 7 * 7 + x * 7 + i] = ft[i];
-                }
-            }
-        }
+    // #[cfg(feature = "nightly")]
+    // fn get_features(board: &board::Board, mv: Move, device: &Device) -> Tensor<Rank3<7, 7, 7>> {
+    //     let mut features = device.zeros();
+    //     let mut data = [0.0; 7 * 7 * 7];
+    //     for y in 0..board::BOARD_SIZE {
+    //         for x in 0..board::BOARD_SIZE {
+    //             let ft = board[&Square::<7>::new(x, y)]
+    //                 .map_or([0.0; 7], Self::get_features_for_placement);
+    //             let x = x as usize;
+    //             let y = y as usize;
+    //             for i in 0..ft.len() {
+    //                 data[y * 7 * 7 + x * 7 + i] = ft[i];
+    //             }
+    //         }
+    //     }
 
-        if let Move::Place(placement) = mv {
-            let square = placement.square;
-            let ft = Self::get_features_for_placement(placement);
-            let x = square.x() as usize;
-            let y = square.y() as usize;
-            let start = y * 7 * 7 + x * 7;
+    //     if let Move::Place(placement) = mv {
+    //         let square = placement.square;
+    //         let ft = Self::get_features_for_placement(placement);
+    //         let x = square.x() as usize;
+    //         let y = square.y() as usize;
+    //         let start = y * 7 * 7 + x * 7;
 
-            for i in 0..ft.len() {
-                data[start + i] = ft[i];
-            }
+    //         for i in 0..ft.len() {
+    //             data[start + i] = ft[i];
+    //         }
 
-            for i in 0..4 {
-                data[start + i * 3 + 2] = 1.0;
-            }
-        }
-        features.copy_from(&data);
-        features
-    }
+    //         for i in 0..4 {
+    //             data[start + i * 3 + 2] = 1.0;
+    //         }
+    //     }
+    //     features.copy_from(&data);
+    //     features
+    // }
 
-    #[cfg(not(feature = "nightly"))]
-    fn get_features(board: &board::Board, mv: Move, device: &Device) -> Tensor<Rank1<588>> {
+    // #[cfg(not(feature = "nightly"))]
+    fn get_features(
+        board: &board::Board,
+        mv: Move,
+        device: &Device,
+    ) -> Tensor<Rank1<588>, f32, Cpu> {
         let mut features = device.zeros();
         let mut data = [0.0; 588];
         for y in 0..board::BOARD_SIZE {
@@ -225,8 +239,8 @@ struct Dataset {
     // #[cfg(feature = "nightly")]
     // pub features: Vec<Tensor<Rank3<7, 7, 7>>>,
     // #[cfg(not(feature = "nightly"))]
-    pub features: Vec<Tensor<Rank1<588>>>,
-    pub labels: Vec<Tensor<Rank1<1>>>,
+    pub features: Vec<Tensor<Rank1<588>, f32, Cpu>>,
+    pub labels: Vec<Tensor<Rank1<1>, f32, Cpu>>,
 }
 
 impl Dataset {
@@ -256,7 +270,7 @@ impl Dataset {
             .map(|(board, mv)| EdgeStrategy::get_features(&board, mv, device))
             .collect();
 
-        let labels: Vec<Tensor<Rank1<1>>> = scores
+        let labels: Vec<Tensor<Rank1<1>, f32, Cpu>> = scores
             .into_iter()
             .map(|score| device.tensor([score]))
             .collect();

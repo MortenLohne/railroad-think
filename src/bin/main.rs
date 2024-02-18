@@ -1,3 +1,5 @@
+#![feature(stdsimd)]
+
 use clap::{Args, Parser};
 use game::Game;
 use mcts::heuristics::Heuristics;
