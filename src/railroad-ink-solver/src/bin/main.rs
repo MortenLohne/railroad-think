@@ -1,3 +1,4 @@
+use clap::{Args, Parser};
 use game::Game;
 use mcts::heuristics::Heuristics;
 use mcts::MonteCarloTree;
@@ -5,23 +6,43 @@ use railroad_ink_solver::mcts::trainer::simulated_annealing;
 use railroad_ink_solver::*;
 use std::thread;
 
+#[derive(Parser)] // requires `derive` feature
+enum Cli {
+    NN(NeuralNetworkArgs),
+}
+
+#[derive(Args)]
+struct NeuralNetworkArgs {
+    /// Name of the person to greet
+    #[arg(short, long)]
+    train: bool,
+}
+
 fn main() {
-    // TODO: CLI
-    // Run the simulated annealing algorithm_
-    println!("Running simulated annealing...");
-    let max_iterations = 10_000;
-    let initial_temperature = 1.0;
-    let initial_score = 53.279;
-    let temperature_decay_rate = 0.95;
-    let variable = Some(4);
-    let heuristics = simulated_annealing(
-        max_iterations,
-        initial_temperature,
-        initial_score,
-        temperature_decay_rate,
-        variable,
-    );
-    println!("heuristics: {heuristics:?}");
+    let Cli::NN(args) = Cli::parse();
+    if args.train {
+        // let path = "./src/mcts/heuristics/heuristics.csv";
+        // let heuristics = Heuristics::from_csv(path);
+        // generate_training_data(100, 1000);
+        let mut model = mcts::heuristics::nn::edge_strategy::EdgeStrategy::create_model();
+        model.train_model_path("2024-test");
+    }
+
+    // // Run the simulated annealing algorithm_
+    // println!("Running simulated annealing...");
+    // let max_iterations = 10_000;
+    // let initial_temperature = 1.0;
+    // let initial_score = 53.279;
+    // let temperature_decay_rate = 0.95;
+    // let variable = Some(4);
+    // let heuristics = simulated_annealing(
+    //     max_iterations,
+    //     initial_temperature,
+    //     initial_score,
+    //     temperature_decay_rate,
+    //     variable,
+    // );
+    // println!("heuristics: {heuristics:?}");
 
     // let path = "./src/mcts/heuristics/heuristics.csv";
     // let heuristics = Heuristics::from_csv(path);

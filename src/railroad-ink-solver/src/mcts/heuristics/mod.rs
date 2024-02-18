@@ -7,7 +7,9 @@ use crate::pieces::Piece;
 use std::fs::File;
 use std::io::prelude::*;
 pub mod nn;
-use nn::edge_strategy::EdgeStrategy;
+use nn::edge_strategy::EdgeStrategy as NeuralNetwork;
+// use nn::face_strategy::FaceStrategy;
+use ord_subset::OrdSubsetIterExt;
 mod rave;
 
 pub type HeuristicOptions = [[f64; 7]; 8];
@@ -118,7 +120,7 @@ pub struct Heuristics {
     pub parameters: Parameters,
     pub rave: Option<rave::Rave>,
     pub tree_reuse: bool,
-    pub move_nn: Option<EdgeStrategy>,
+    pub move_nn: Option<NeuralNetwork>,
 }
 
 impl Heuristics {
@@ -133,8 +135,8 @@ impl Heuristics {
             rave: None,
             // rave,
             tree_reuse: true,
-            move_nn: None,
-            // move_nn: Some(EdgeStrategy::load("model-dropout")),
+            // move_nn: None,
+            move_nn: Some(NeuralNetwork::load("model-16-16")),
         }
     }
 
@@ -157,7 +159,14 @@ impl Heuristics {
 
     #[must_use]
     pub fn get_rollout_policy_value(&self, game: &Game, mv: Move) -> f64 {
-        self.get_move_estimation(game, mv)
+        self.get_move_estimation(game, mv) // todo: maybe add some randomness here
+    }
+
+    #[must_use]
+    pub fn select_rollout_move(&self, game: &Game, moves: Vec<Move>) -> Option<Move> {
+        moves
+            .into_iter()
+            .ord_subset_max_by_key(|mv| self.get_move_estimation(game, *mv))
     }
 
     #[must_use]
@@ -235,6 +244,12 @@ impl Heuristics {
         0.0
     }
 
+    pub fn update(&mut self, turn: u8, mv: Move, score: f64) {
+        if let Some(rave) = &mut self.rave {
+            rave.update_rave(turn, mv, score);
+        }
+    }
+
     // #[must_use]
     /// Recieve a value if the move connects to the edge of the longest network path
     // fn piece_connects_to_longest_path(&self, game: &Game, mv: Move) -> f64 {
@@ -292,6 +307,9 @@ impl Heuristics {
         game: &Game,
     ) -> f64 {
         let turn = usize::from(game.turn);
+        if turn == 7 {
+            return mean_score;
+        }
 
         let ucb = mean_score;
         let exploration_bias = self.exploration_bias(turn);
@@ -327,9 +345,6 @@ impl Heuristics {
 
             q + exploration_term
         }
-        // } else {
-        //     ucb + exploration_term
-        // }
     }
 }
 

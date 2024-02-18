@@ -45,6 +45,7 @@ dfdx = { git = "https://github.com/coreylowman/dfdx", features = [
   "numpy",
 ] }
 indicatif = "0.17.3"
+clap = { version = "4.5.1", features = ["derive"] }
 
 [dev-dependencies]
 criterion = "0.3.5"

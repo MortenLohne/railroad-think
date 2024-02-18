@@ -24,13 +24,13 @@ use dfdx::{data::SubsetIterator, losses::mse_loss, optim::Adam, prelude::*};
 
 const MODEL_PATH: &str = "./src/mcts/heuristics/nn";
 
-#[cfg(feature = "nightly")]
-type Model = (
-    (Conv2D<7, 3, 3, 1, 1>, ReLU, Flatten2D),
-    (Linear<147, 1>, ReLU),
-);
+// #[cfg(feature = "nightly")]
+// type Model = (
+//     (Conv2D<7, 3, 3, 1, 1>, ReLU, Flatten2D),
+//     (Linear<147, 1>, ReLU),
+// );
 
-#[cfg(not(feature = "nightly"))]
+// #[cfg(not(feature = "nightly"))]
 type Model = (
     (Linear<588, 16>, ReLU),
     // DropoutOneIn<2>,
@@ -72,9 +72,11 @@ impl EdgeStrategy {
 
     #[must_use]
     pub fn predict(&self, board: &board::Board, mv: &Move) -> f32 {
-        self.model
+        let v = self
+            .model
             .forward(Self::get_features(board, *mv, &self.device))
-            .array()[0]
+            .array()[0];
+        v
     }
 
     pub fn train_model(&mut self) {
@@ -220,9 +222,9 @@ impl EdgeStrategy {
 }
 
 struct Dataset {
-    #[cfg(feature = "nightly")]
-    pub features: Vec<Tensor<Rank3<7, 7, 7>>>,
-    #[cfg(not(feature = "nightly"))]
+    // #[cfg(feature = "nightly")]
+    // pub features: Vec<Tensor<Rank3<7, 7, 7>>>,
+    // #[cfg(not(feature = "nightly"))]
     pub features: Vec<Tensor<Rank1<588>>>,
     pub labels: Vec<Tensor<Rank1<1>>>,
 }
