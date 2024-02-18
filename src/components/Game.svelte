@@ -1,7 +1,8 @@
-<script>
+<script lang="ts">
 import Select from '/src/components/Select.svelte';
 import Button from '/src/components/Button.svelte';
 import Encoding from '/src/components/Encoding.svelte';
+
 import { group } from 'd3-array';
 
 import BoardRenderer from './BoardRenderer.svelte';

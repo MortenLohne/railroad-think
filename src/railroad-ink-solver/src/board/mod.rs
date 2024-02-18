@@ -219,7 +219,7 @@ impl Board {
                     let is_valid = is_valid
                         && Direction::iter()
                             .map(|dir| (dir, piece.connection(dir)))
-                            .filter(|(_, connection)| connection != &Connection::None)
+                            .filter(|(_, connection)| connection.is_some())
                             .all(|(dir, con)| {
                                 self.get(Self::get_neighbor(square, dir)).map_or_else(
                                     || !{
@@ -257,6 +257,71 @@ impl Board {
         valid
     }
 
+    #[must_use]
+    pub fn piece_connects_to_exit(&self, placement: Placement) -> bool {
+        if !placement.square.is_border() {
+            return false;
+        }
+
+        Direction::iter()
+            .map(|dir| (dir, placement.connection(dir)))
+            .filter(|(_, connection)| connection.is_some())
+            .any(|(dir, con)| {
+                Self::EXITS
+                    .iter()
+                    .any(|(exit_square, (exit_dir, exit_con))| {
+                        exit_square == &placement.square && exit_dir == &dir && exit_con == &con
+                    })
+            })
+    }
+
+    #[must_use]
+    pub fn piece_count_connections(&self, placement: Placement) -> u8 {
+        Direction::iter()
+            .map(|dir| (dir, placement.connection(dir)))
+            .filter(|(_, connection)| connection.is_some())
+            .filter(|(dir, con)| {
+                self.get(Self::get_neighbor(placement.square, *dir))
+                    .map_or_else(|| false, |place| &place.connection(dir.inverse()) == con)
+            })
+            .count() as u8
+    }
+
+    #[must_use]
+    pub fn piece_locks_out_other_piece(&self, placement: Placement) -> bool {
+        Direction::iter()
+            .filter(|dir| placement.connection(*dir).is_none())
+            .any(|dir| {
+                self.get(Self::get_neighbor(placement.square, dir))
+                    .map_or_else(|| false, |place| place.connection(dir.inverse()).is_some())
+            })
+    }
+
+    #[must_use]
+    pub fn piece_is_2nd_order_neighbor(&self, placement: Placement) -> bool {
+        Direction::iter()
+            .filter(|dir| placement.connection(*dir).is_some())
+            .map(|source_dir| Self::get_neighbor(placement.square, source_dir))
+            .filter(|square| self.get(*square).is_none())
+            .filter(|square| !square.out_of_bounds())
+            .any(|square| self.frontier.get(&square).is_some())
+    }
+
+    #[must_use]
+    pub fn piece_is_3rd_order_neighbor(&self, placement: Placement) -> bool {
+        Direction::iter()
+            .filter(|dir| placement.connection(*dir).is_some())
+            .map(|dir| (dir, Self::get_neighbor(placement.square, dir)))
+            .filter(|(_, square)| self.get(*square).is_none())
+            .any(|(source_dir, square)| {
+                Direction::iter()
+                    .filter(|dir| dir != &source_dir.inverse())
+                    .map(|dir| Self::get_neighbor(square, dir))
+                    .filter(|square| !square.out_of_bounds())
+                    .any(|square| self.frontier.get(&square).is_some())
+            })
+    }
+
     /// Add a placement to the board, and update internal state to match
     pub fn place(&mut self, placement: Placement) {
         let square = placement.square;
@@ -278,7 +343,7 @@ impl Board {
         for direction in Direction::iter() {
             let square = Self::get_neighbor(square, direction);
             let connection = placement.connection(direction);
-            if connection == Connection::None || square.out_of_bounds() {
+            if connection.is_none() || square.out_of_bounds() {
                 continue;
             }
 
@@ -587,9 +652,14 @@ impl Board {
         }
     }
 
+    /// Get the neighbor in the given direction
+    /// Note: This will wrap around at 255, NOT the board boundary.
+    /// TODO: This should probably be a method on Square, and could be an impl of Add<Direction>
+    /// Also, return an Option<Square> instead of wrapping around.
     fn get_neighbor(from: Square<BOARD_SIZE>, direction: Direction) -> Square<BOARD_SIZE> {
         let x = from.x();
         let y = from.y();
+
         match direction {
             North => Square::new(x, y.wrapping_sub(1)),
             East => Square::new(x + 1, y),

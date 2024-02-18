@@ -15,15 +15,15 @@ pub fn simulated_annealing(
     initial_temperature: f64,
     initial_score: f64,
     temperature_decay_rate: f64,
+    variable: Option<usize>,
 ) -> HeuristicOptions {
     let path = "./src/mcts/heuristics/heuristics.csv";
-    let heuristics = Heuristics::from_csv(path);
+    let mut heuristics = Heuristics::from_csv(path);
+    heuristics.rave = None;
+    heuristics.move_nn = None;
+    let heuristics = heuristics;
 
-    let mut options = [
-        heuristics.exploration_variables,
-        heuristics.special_cost,
-        heuristics.frontier_size,
-    ];
+    let mut options = heuristics.parameters.as_array();
 
     let mut score = initial_score;
     let mut temperature = initial_temperature;
@@ -34,8 +34,8 @@ pub fn simulated_annealing(
         println!("{options:?}");
         println!();
 
-        let variable = rand::random::<usize>() % 2;
-        let index = rand::random::<usize>() % 7;
+        let variable = variable.unwrap_or_else(|| rand::random::<usize>() % options.len());
+        let index = rand::random::<usize>() % options[variable].len();
         let mut new_options = options;
 
         let random_value = rand::random::<f64>().mul_add(2.0, -1.0);
@@ -64,7 +64,7 @@ pub fn simulated_annealing(
         if accept_change {
             score = (new_score + score) / 2.0;
             options[variable] = new_options[variable];
-            Heuristics::new(options)
+            Heuristics::new(options.into())
                 .to_csv(format!("./src/mcts/heuristics/training/heuristics_{i:03}.csv").as_str())
                 .expect("Error: Could not save heuristics");
         }
@@ -96,7 +96,7 @@ pub fn test_heuristic(heuristics: HeuristicOptions) -> f64 {
 #[must_use]
 pub fn run(n: u8, heuristics: HeuristicOptions) -> i32 {
     let threads = (0..n)
-        .map(|_| thread::spawn(move || play(Heuristics::new(heuristics))))
+        .map(|_| thread::spawn(move || play(Heuristics::new(heuristics.into()))))
         .collect::<Vec<thread::JoinHandle<_>>>();
 
     let mut sum = 0;
@@ -134,43 +134,35 @@ pub fn play(heuristics: Heuristics) -> i32 {
     game.board.score()
 }
 
-pub fn generate_training_data(n: u64, heuristics: Heuristics) {
+/// Generate training data for the neural network
+/// # Panics
+/// Panics if the file cannot be opened
+pub fn generate_training_data(samples: u64, search_duration: u128) {
     let mut rng = rand::thread_rng();
-    let iterations = 1000;
 
-    let bar = ProgressBar::new(n);
-
-    for _ in 0..n {
+    let bar = ProgressBar::new(samples);
+    for _ in 0..samples {
         let game_seed = rng.gen();
         let mcts_seed = rng.gen();
 
         let mut game = Game::new_from_seed(game_seed);
         let mut mcts = MonteCarloTree::new_from_seed(game.clone(), mcts_seed);
-        mcts.heuristics = heuristics.clone();
 
         let mut data: Vec<(String, String)> = Vec::new();
+        bar.inc(1);
 
         while !game.ended {
-            mcts.search_iterations(iterations);
+            mcts.search_duration(search_duration);
             let mv = mcts.best_move();
             data.push((game.board.encode(), format!("{mv:?}")));
             mcts = MonteCarloTree::progress(mcts, mv, &mut game);
         }
 
-        bar.inc(1);
-
         let score = game.board.score();
 
         let data = data
             .iter()
-            .map(|(board, mv)| {
-                format!(
-                    "{board},{mv},{score}",
-                    board = board,
-                    mv = mv,
-                    score = score
-                )
-            })
+            .map(|(board, mv)| format!("{board},{mv},{score}"))
             .collect::<Vec<String>>()
             .join("\n");
 
@@ -181,7 +173,7 @@ pub fn generate_training_data(n: u64, heuristics: Heuristics) {
             .open(path)
             .unwrap();
 
-        if let Err(e) = writeln!(file, "{}", data) {
+        if let Err(e) = writeln!(file, "{data}") {
             eprintln!("Couldn't write to file: {e}");
         }
     }

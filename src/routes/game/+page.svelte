@@ -1,13 +1,7 @@
-<script>
+<script lang="ts">
 import Game from '/src/components/Game.svelte';
-import initSolver, * as solver from '/src/railroad-ink-solver/pkg';
-
-// export let dev; // Are we in production?
-// export let target; // Element the app attaches to
 </script>
 
-{#await initSolver()}
-  loading ...
-{:then _}
+{#await import('/src/railroad-ink-solver/pkg/railroad_ink_solver') then solver}
   <Game {solver} />
 {/await}

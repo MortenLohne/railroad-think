@@ -1,235 +1,340 @@
 use crate::board::Board;
 use crate::game::mv::Move;
-use std::collections::HashMap;
+use crate::game::Game;
+use crate::mcts::Score;
+use crate::pieces::Piece;
+
 use std::fs::File;
 use std::io::prelude::*;
-use std::str::FromStr;
 pub mod nn;
 use nn::edge_strategy::EdgeStrategy;
 mod rave;
 
-pub type HeuristicOptions = [[f64; 7]; 3];
+pub type HeuristicOptions = [[f64; 7]; 8];
 
-type Turn = u8;
-
-// TODO: Consider these state heuristics:
-// * "Centrality". Give points to each placed piece as close they are to the center
-// * Connectedness. Give points to connections made, minus one for the piece placed from.
-// * "Potential" connectedness. Is there a way to calculate this? Clustered frontiers?
-// * Exit connection. Assign points for placements on the exit
-//
 #[derive(Clone)]
-pub struct Heuristics {
+pub struct Parameters {
+    pub unexplored_value: [f64; 7],
     pub exploration_variables: [f64; 7],
     pub special_cost: [f64; 7],
-    pub frontier_size: [f64; 7],
-    pub rave: HashMap<Move, rave::Value>,
-    pub local_rave: HashMap<(Turn, Move), rave::Value>,
-    pub rave_jitter: f64,
-    pub rave_exploration_bias: f64,
-    pub use_rave: bool,
-    pub tree_reuse: bool,
-    pub use_nn: bool,
-    pub move_evaluation_nn: EdgeStrategy,
+    pub piece_connects_to_exit: [f64; 7],
+    pub piece_connects_to_other_piece: [f64; 7],
+    pub piece_locks_out_other_piece: [f64; 7],
+    pub piece_is_2nd_order_neighbor: [f64; 7],
+    pub piece_is_3rd_order_neighbor: [f64; 7],
 }
 
-impl Heuristics {
+impl Parameters {
     #[must_use]
-    pub fn new(raw: HeuristicOptions) -> Self {
-        Self {
-            exploration_variables: raw[0], // exploration bias
-            special_cost: raw[1],
-            frontier_size: raw[2],
-            rave: HashMap::new(),
-            local_rave: HashMap::new(),
-            rave_jitter: 0.5,
-            rave_exploration_bias: 18.0,
-            use_rave: true,
-            tree_reuse: true,
-            use_nn: true,
-            move_evaluation_nn: EdgeStrategy::load(),
-        }
-    }
-
-    #[must_use]
-    /// Load a `.csv`-file at the given `path` and return a new instance of Heuristics
+    /// Load the heuristic parameters from a csv file.
+    ///
     /// # Panics
-    /// Panics if the file could not be found or if there was an error reading the file
-    /// # Example file
-    /// ```csv
-    /// exploration_variables,special_cost,frontier_size
-    /// 1.5,9.0,0.9
-    /// 1.5,8.0,0.8
-    /// 1.5,6.0,0.7
-    /// 1.5,1.0,0.6
-    /// 1.5,0.0,0.4
-    /// 1.5,0.0,0.2
-    /// 1.5,0.0,0.0
-    /// ```
+    /// Panics if the file cannot be opened or read.
     pub fn from_csv(path: &str) -> Self {
         let mut file = File::open(path).expect("Error loading Heuristics: Could not find path");
         let mut contents = String::new();
         file.read_to_string(&mut contents)
             .expect("Error loading Heuristics: Could not read file to string");
 
-        let mut heuristics = Self::new([[0.0; 7], [0.0; 7], [0.0; 7]]);
-        let mut lines = contents.split('\n');
-        lines.next(); // Skip header
-        for (i, line) in lines.enumerate() {
-            if i > 6 {
-                break;
-            }
+        let mut lines = contents.lines();
+        // skip the header:
+        lines.next();
+
+        let mut parameters = Parameters::from([[0.0; 7]; 8]);
+
+        for i in 0..7 {
+            let line = lines.next().unwrap();
             let mut values = line.split(',');
-            heuristics.exploration_variables[i] = values.next().unwrap().parse().unwrap();
-            heuristics.special_cost[i] = values.next().unwrap().parse().unwrap();
-            heuristics.frontier_size[i] = values.next().unwrap().parse().unwrap();
+            parameters.unexplored_value[i] = values.next().unwrap().parse().unwrap();
+            parameters.exploration_variables[i] = values.next().unwrap().parse().unwrap();
+            parameters.special_cost[i] = values.next().unwrap().parse().unwrap();
+            parameters.piece_connects_to_exit[i] = values.next().unwrap().parse().unwrap();
+            parameters.piece_connects_to_other_piece[i] = values.next().unwrap().parse().unwrap();
+            parameters.piece_locks_out_other_piece[i] = values.next().unwrap().parse().unwrap();
+            parameters.piece_is_2nd_order_neighbor[i] = values.next().unwrap().parse().unwrap();
+            parameters.piece_is_3rd_order_neighbor[i] = values.next().unwrap().parse().unwrap();
         }
-        heuristics
+
+        parameters
+    }
+
+    /// Save the heuristic parameters to a csv file.
+    /// # Errors
+    /// Returns an error if the file cannot be opened or written to.
+    pub fn to_csv(&self, path: &str) -> std::io::Result<()> {
+        let mut file = File::create(path)?;
+        let mut contents = String::new();
+
+        for turn in 0..7 {
+            contents.push_str(&format!(
+                "{},{},{},{},{},{},{},{}\r",
+                self.unexplored_value[turn],
+                self.exploration_variables[turn],
+                self.special_cost[turn],
+                self.piece_connects_to_exit[turn],
+                self.piece_connects_to_other_piece[turn],
+                self.piece_locks_out_other_piece[turn],
+                self.piece_is_2nd_order_neighbor[turn],
+                self.piece_is_3rd_order_neighbor[turn],
+            ));
+        }
+
+        write!(file, "{contents}")?;
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn as_array(&self) -> [[f64; 7]; 8] {
+        [
+            self.unexplored_value,
+            self.exploration_variables,
+            self.special_cost,
+            self.piece_connects_to_exit,
+            self.piece_connects_to_other_piece,
+            self.piece_locks_out_other_piece,
+            self.piece_is_2nd_order_neighbor,
+            self.piece_is_3rd_order_neighbor,
+        ]
+    }
+}
+
+impl From<[[f64; 7]; 8]> for Parameters {
+    fn from(array: [[f64; 7]; 8]) -> Self {
+        Self {
+            unexplored_value: array[0],
+            exploration_variables: array[1],
+            special_cost: array[2],
+            piece_connects_to_exit: array[3],
+            piece_connects_to_other_piece: array[4],
+            piece_locks_out_other_piece: array[5],
+            piece_is_2nd_order_neighbor: array[6],
+            piece_is_3rd_order_neighbor: array[7],
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Heuristics {
+    pub parameters: Parameters,
+    pub rave: Option<rave::Rave>,
+    pub tree_reuse: bool,
+    pub move_nn: Option<EdgeStrategy>,
+}
+
+impl Heuristics {
+    #[must_use]
+    pub fn new(parameters: Parameters) -> Self {
+        // let mut rave = rave::Rave::new();
+        // rave.load_rave("./src/mcts/heuristics/rave/rave.csv");
+        // let rave = Some(rave);
+
+        Self {
+            parameters,
+            rave: None,
+            // rave,
+            tree_reuse: true,
+            move_nn: None,
+            // move_nn: Some(EdgeStrategy::load("model-dropout")),
+        }
+    }
+
+    #[must_use]
+    pub fn from_csv(path: &str) -> Self {
+        Self {
+            parameters: Parameters::from_csv(path),
+            rave: None,
+            tree_reuse: true,
+            move_nn: None,
+        }
     }
 
     /// Export this instance of Heuristics to a `.csv`-file at the given `path`
     /// # Errors
     /// Erros if there was an error writing to the file
     pub fn to_csv(self, path: &str) -> std::io::Result<()> {
-        let mut file = File::create(path)?;
-        file.write_all(b"exploration_variables,special_cost,frontier_size\n")?;
-        for i in 0..7 {
-            file.write_all(
-                format!(
-                    "{},{},{}\n",
-                    self.exploration_variables[i], self.special_cost[i], self.frontier_size[i]
-                )
-                .as_bytes(),
-            )?;
-        }
-        Ok(())
+        self.parameters.to_csv(path)
     }
 
     #[must_use]
-    pub fn get_rave(&self, turn: u8, mv: &Move) -> f64 {
-        const MAGIC_DEFAULT_RAVE_SCORE: f64 = f64::MAX;
-        match self.local_rave.get(&(turn, *mv)) {
-            None => MAGIC_DEFAULT_RAVE_SCORE,
-            Some(rave_value) => rave_value.get_mean(),
-        }
-    }
-
-    pub fn update_rave(&mut self, turn: u8, mv: &Move, score: f64) {
-        self.local_rave
-            .entry((turn, *mv))
-            .or_insert_with(rave::Value::default)
-            .update(score as i32);
-    }
-
-    /// Export this instance of Rave to a `.csv`-file at the given `path`
-    ///
-    /// # Errors
-    /// Returns an error if the path could not be written to
-    pub fn load_rave(&mut self, path: &str) {
-        let mut file = File::open(path).expect("Error loading Rave: Could not find path");
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)
-            .expect("Error loading Rave: Could not read file to string");
-
-        let map: Result<HashMap<_, _, _>, ()> = contents
-            .split('\n')
-            .skip(1)
-            .map(|row| row.split(',').collect::<Vec<_>>())
-            .map(|row| {
-                let place = Move::from_str(row[0])?;
-                let visits = row[1].parse().expect("load_rave: could not parse visits");
-                let total = row[2].parse().expect("load_rave: could not parse total");
-                Ok((place, rave::Value::new_with_data(visits, total)))
-            })
-            .collect();
-        let map = map.expect("Error loading Rave: Could not parse file to HashMap");
-        self.rave = map;
-    }
-
-    /// Export this instance of Local Rave to a `.csv`-file at the given `path`
-    /// TODO: move to rave.rs
-    /// # Errors
-    /// Returns an error if the path could not be written to
-    pub fn dump_local_rave(&self, path: &str) -> Result<(), std::io::Error> {
-        let header = String::from("turn,move,visits,total");
-        let data = self
-            .local_rave
-            .iter()
-            .map(|((turn, mv), val)| format!("{turn},{mv:?},{},{}", val.visits, val.total_score))
-            .fold(header, |csv, next| format!("{csv}\n{next}"));
-
-        let mut file = File::create(path)?;
-        let mut buffer = Vec::new();
-        write!(&mut buffer, "{data}")?;
-        file.write_all(buffer.as_slice())
-    }
-
-    pub fn load_local_rave(&mut self, path: &str) {
-        let mut file = File::open(path).expect("Error loading Rave: Could not find path");
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)
-            .expect("Error loading Rave: Could not read file to string");
-
-        let map: Result<HashMap<_, _, _>, ()> = contents
-            .split('\n')
-            .skip(1)
-            .map(|row| row.split(',').collect::<Vec<_>>())
-            .map(|row| {
-                let turn = u8::from_str(row[0]).expect("load_local_rave: could not parse turn");
-                let place = Move::from_str(row[1])?;
-                let visits = row[2].parse().expect("load_rave: could not parse visits");
-                let total = row[3].parse().expect("load_rave: could not parse total");
-                Ok(((turn, place), rave::Value::new_with_data(visits, total)))
-            })
-            .collect();
-        let map = map.expect("Error loading Rave: Could not parse file to HashMap");
-        self.local_rave = map;
-    }
-
-    pub fn uniform_rave(&mut self, weight: u128) {
-        self.rave.values_mut().for_each(|val| val.uniform(weight));
-    }
-
-    pub fn uniform_local_rave(&mut self, weight: u128) {
-        self.local_rave
-            .values_mut()
-            .for_each(|val| val.uniform(weight));
+    pub fn get_rollout_policy_value(&self, game: &Game, mv: Move) -> f64 {
+        self.get_move_estimation(game, mv)
     }
 
     #[must_use]
     pub fn exploration_bias(&self, turn: usize) -> f64 {
-        if turn == 7 {
-            1.0
-        } else {
-            self.exploration_variables[turn]
-        }
+        self.parameters.exploration_variables[turn - 1]
     }
 
     #[must_use]
-    pub fn get_special_cost(&self, turn: usize, mv: &Move) -> f64 {
+    /// Recieve a value if the move would expend a special piece
+    pub fn special_use(&self, turn: usize, mv: Move) -> f64 {
         if let Move::Place(placement) = mv {
-            if turn < 7 && 8 < placement.piece && placement.piece < 15 {
-                self.special_cost[turn - 1]
-            } else {
-                0.0
+            if turn < 7 && Piece::is_special(placement.piece) {
+                return self.parameters.special_cost[turn - 1];
             }
+        }
+        0.0
+    }
+
+    #[must_use]
+    /// Recieve a value if the move would connect to an exit
+    fn piece_connects_to_exit(&self, turn: usize, board: &Board, mv: Move) -> f64 {
+        if let Move::Place(placement) = mv {
+            if board.piece_connects_to_exit(placement) {
+                return self.parameters.piece_connects_to_exit[turn - 1];
+            }
+        }
+        0.0
+    }
+
+    #[must_use]
+    /// Recieve a value if the move would connect to more than one other piece
+    fn piece_connects_to_other_piece(&self, turn: usize, board: &Board, mv: Move) -> f64 {
+        if let Move::Place(placement) = mv {
+            let connections = board.piece_count_connections(placement);
+            if connections > 1 {
+                return self.parameters.piece_connects_to_other_piece[turn - 1];
+            }
+        }
+        0.0
+    }
+
+    #[must_use]
+    /// Recieve a value if the move would lock out another piece
+    fn piece_locks_out_other_piece(&self, turn: usize, board: &Board, mv: Move) -> f64 {
+        if let Move::Place(placement) = mv {
+            let locks_out = board.piece_locks_out_other_piece(placement);
+            if locks_out {
+                return self.parameters.piece_locks_out_other_piece[turn - 1];
+            }
+        }
+        0.0
+    }
+
+    #[must_use]
+    /// Recieve a value for a move that is 2nd order neighbor to another piece
+    fn piece_is_2nd_order_neighbor(&self, turn: usize, board: &Board, mv: Move) -> f64 {
+        if let Move::Place(placement) = mv {
+            let is_2nd_order_neighbor = board.piece_is_2nd_order_neighbor(placement);
+            if is_2nd_order_neighbor {
+                return self.parameters.piece_is_2nd_order_neighbor[turn - 1];
+            }
+        }
+        0.0
+    }
+
+    #[must_use]
+    /// Recieve a value for a move that is 3rd order neighbor to another piece
+    fn piece_is_3rd_order_neighbor(&self, turn: usize, board: &Board, mv: Move) -> f64 {
+        if let Move::Place(placement) = mv {
+            let is_3rd_order_neighbor = board.piece_is_3rd_order_neighbor(placement);
+            if is_3rd_order_neighbor {
+                return self.parameters.piece_is_3rd_order_neighbor[turn - 1];
+            }
+        }
+        0.0
+    }
+
+    // #[must_use]
+    /// Recieve a value if the move connects to the edge of the longest network path
+    // fn piece_connects_to_longest_path(&self, game: &Game, mv: Move) -> f64 {
+    //     if let Move::Place(placement) = mv {
+    //         let connects_to_longest_path = game.board.piece_connects_to_longest_path(placement);
+    //         if connects_to_longest_path {
+    //             1.0
+    //         } else {
+    //             0.0
+    //         }
+    //     } else {
+    //         0.0
+    //     }
+    // }
+
+    // #[must_use]
+    // Recieve a value if the move would connect to the longest network path, but then ends it
+    // fn piece_ends_longest_path(&self, game: &Game, mv: Move) -> f64 {
+    //     if let Move::Place(placement) = mv {
+    //         let ends_longest_path = game.board.piece_ends_longest_path(placement);
+    //         if ends_longest_path {
+    //             -1.0
+    //         } else {
+    //             0.0
+    //         }
+    //     } else {
+    //         0.0
+    //     }
+    // }
+    #[must_use]
+    pub fn get_move_estimation(&self, game: &Game, mv: Move) -> f64 {
+        let board = &game.board;
+        if let Some(nn) = &self.move_nn {
+            f64::from(nn.predict(board, &mv))
+        // } else if let Some(rave) = &self.rave {
+        //     rave.get_move_estimation(board, mv)
         } else {
-            0.0
+            let turn = game.turn as usize;
+            self.special_use(turn, mv)
+                + self.piece_connects_to_exit(turn, board, mv)
+                + self.piece_connects_to_other_piece(turn, board, mv)
+                + self.piece_locks_out_other_piece(turn, board, mv)
+                + self.piece_is_2nd_order_neighbor(turn, board, mv)
+                + self.piece_is_3rd_order_neighbor(turn, board, mv)
         }
     }
 
     #[must_use]
-    pub fn get_nn_cost(&self, board: &Board, mv: &Move) -> f64 {
-        self.move_evaluation_nn.predict(board, mv) as f64
+    pub fn get_exploration_value(
+        &self,
+        mv: Move,
+        mean_score: f64,
+        visits: u64,
+        parent_visits: u64,
+        game: &Game,
+    ) -> f64 {
+        let turn = usize::from(game.turn);
+
+        let ucb = mean_score;
+        let exploration_bias = self.exploration_bias(turn);
+        let exploration = if visits == 0 {
+            // self.get_rollout_policy_value(game, mv)
+            self.parameters.unexplored_value[turn]
+        } else {
+            Score::sqrt(Score::ln(parent_visits as f64 / visits as f64))
+        };
+
+        let exploration_term = exploration_bias * exploration;
+
+        let exploration_term = exploration_term + self.special_use(turn, mv);
+
+        if self.move_nn.is_some() {
+            let q = self.get_rollout_policy_value(game, mv);
+            q + exploration_term
+        } else if let Some(rave) = self.rave.as_ref() {
+            let k = 1.;
+            let rave_value = rave.get_rave(turn as u8, mv);
+            let rave_value = rave_value + rave.rave_exploration_bias;
+            let n = visits as f64;
+            let beta = (k / 3.0f64.mul_add(n, k)).sqrt();
+            let q = (1.0 - beta).mul_add(ucb, beta * rave_value);
+
+            q + exploration_term
+        } else {
+            let estimated_value = self.get_move_estimation(game, mv);
+            let k = 1.;
+            let n = visits as f64;
+            let beta = (k / 3.0f64.mul_add(n, k)).sqrt();
+            let q = (1.0 - beta).mul_add(ucb, beta * estimated_value);
+
+            q + exploration_term
+        }
+        // } else {
+        //     ucb + exploration_term
+        // }
     }
 }
 
 impl Default for Heuristics {
     fn default() -> Self {
-        Self::new([
-            [1.5; 7],
-            [9.0, 8.0, 6.0, 1.0, 0.0, 0.0, 0.0],
-            [0.9, 0.8, 0.7, 0.6, 0.4, 0.2, 0.0],
-        ])
+        Self::new(Parameters::from_csv("./src/mcts/heuristics/parameters.csv"))
     }
 }

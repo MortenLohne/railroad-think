@@ -3,6 +3,13 @@
 //! - rail
 //! - road
 //! - current
+//!
+//! Seems to not work that well, maybe because the training data is too small.
+//! Another solution is to train the network to value a placement instead.
+//!
+//! Board => nn => Placement 1hot
+//!
+//! Value either by score or boolean (whether the move was chosen or not)
 #![cfg_attr(feature = "nightly", feature(generic_const_exprs))]
 
 use crate::{
@@ -15,7 +22,7 @@ use std::{io::Read, time::Instant};
 
 use dfdx::{data::SubsetIterator, losses::mse_loss, optim::Adam, prelude::*};
 
-const MODEL_PATH: &str = "./src/mcts/heuristics/nn/model.npz";
+const MODEL_PATH: &str = "./src/mcts/heuristics/nn";
 
 #[cfg(feature = "nightly")]
 type Model = (
@@ -24,7 +31,12 @@ type Model = (
 );
 
 #[cfg(not(feature = "nightly"))]
-type Model = ((Linear<588, 147>, ReLU), (Linear<147, 1>, ReLU));
+type Model = (
+    (Linear<588, 16>, ReLU),
+    // DropoutOneIn<2>,
+    (Linear<16, 16>, ReLU),
+    (Linear<16, 1>, ReLU),
+);
 
 type Device = Cpu;
 
@@ -37,6 +49,7 @@ pub struct EdgeStrategy {
 }
 
 impl EdgeStrategy {
+    #[must_use]
     pub fn create_model() -> Self {
         let device: Cpu = dfdx::tensor::Cpu::default();
         let mut model: Model = device.build_module();
@@ -44,21 +57,31 @@ impl EdgeStrategy {
         Self { model, device }
     }
 
-    pub fn load() -> Self {
+    #[must_use]
+    pub fn load(model_name: &str) -> Self {
         let device: Cpu = dfdx::tensor::Cpu::default();
         let mut model: Model = device.build_module();
-        model.load(MODEL_PATH).expect("Could not load model");
+        model
+            .load(format!("{MODEL_PATH}/{model_name}.npz"))
+            .expect("Could not load model");
 
         Self { model, device }
     }
 
+    #[must_use]
     pub fn predict(&self, board: &board::Board, mv: &Move) -> f32 {
         self.model
-            .forward(Self::get_features(board, mv.clone(), &self.device))
+            .forward(Self::get_features(board, *mv, &self.device))
             .array()[0]
     }
 
     pub fn train_model(&mut self) {
+        self.train_model_path("model");
+    }
+
+    /// # Panics
+    /// If the model cannot be saved
+    pub fn train_model_path(&mut self, model_path: &str) {
         let device: Cpu = dfdx::tensor::Cpu::default();
 
         let mut rng = rand::thread_rng();
@@ -92,15 +115,17 @@ impl EdgeStrategy {
             bar.finish_and_clear();
 
             println!(
-                "Epoch {i_epoch:03} in {:.2} ms ({:.2} batches/s): avg sample loss {:.1}",
+                "Epoch {i_epoch:03} in {:.2} ms ({:.2} batches/s): avg sample loss {:.3}",
                 dur.as_millis(),
                 num_batches as f32 / dur.as_secs_f32(),
-                BATCH_SIZE as f32 * total_epoch_loss / num_batches as f32,
+                total_epoch_loss / num_batches as f32,
             );
 
-            if (i_epoch + 1) % 500 == 0 {
+            if (i_epoch + 1) % 250 == 0 {
                 println!("saving");
-                self.model.save(MODEL_PATH).expect("failed to save model");
+                self.model
+                    .save(format!("{MODEL_PATH}/{model_path}.npz"))
+                    .expect("failed to save model");
             }
         }
     }

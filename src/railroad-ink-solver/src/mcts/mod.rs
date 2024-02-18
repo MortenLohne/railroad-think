@@ -167,7 +167,9 @@ impl Edge {
         node.total_score += result;
         self.mean_score = node.total_score / self.visits as f64;
         if !matches!(self.mv, Move::SetRoll(..)) {
-            heuristics.update_rave(turn, &self.mv, result);
+            if let Some(rave) = heuristics.rave.as_mut() {
+                rave.update_rave(turn, self.mv, result);
+            }
         }
         result
     }
@@ -179,22 +181,25 @@ impl Edge {
         let exploration_bias = heuristics.exploration_bias(turn as usize);
         let exploration = if self.visits == 0 {
             Score::MAX
+            // heuristics.get_rollout_policy_value(game.turn, &game, &self.mv)
         } else {
             Score::sqrt(Score::ln(parent_visits as f64 / self.visits as f64))
         };
 
         let exploration_term = exploration_bias * exploration;
 
-        let exploration_term =
-            exploration_term - heuristics.get_special_cost(turn as usize, &self.mv);
+        let exploration_term = exploration_term + heuristics.special_use(turn as usize, self.mv);
 
-        if heuristics.use_rave {
+        if heuristics.move_nn.is_some() {
+            let q = heuristics.get_rollout_policy_value(game, self.mv);
+            q + exploration_term
+        } else if let Some(rave) = heuristics.rave.as_ref() {
             let k = 1.;
-            let rave = heuristics.get_rave(turn, &self.mv);
-            let rave = rave + heuristics.rave_exploration_bias;
+            let rave_value = rave.get_rave(turn, self.mv);
+            let rave_value = rave_value + rave.rave_exploration_bias;
             let n = self.visits as f64;
             let beta = (k / 3.0f64.mul_add(n, k)).sqrt();
-            let q = (1.0 - beta).mul_add(ucb, beta * rave);
+            let q = (1.0 - beta).mul_add(ucb, beta * rave_value);
 
             q + exploration_term
         } else {
@@ -237,19 +242,20 @@ impl Edge {
 
         let moves = game.generate_moves();
 
-        let mv = if heuristics.use_rave {
-            let mv_iter = moves.into_iter();
-            if heuristics.rave_jitter == 0. {
-                mv_iter.ord_subset_max_by_key(|mv| heuristics.get_rave(game.turn, mv))
-            } else {
-                let jitter = heuristics.rave_jitter;
-                mv_iter.ord_subset_max_by_key(|mv| {
-                    heuristics.get_rave(game.turn, mv) + rng.gen_range(-jitter..jitter)
-                })
+        let mv = match heuristics.rave.as_ref() {
+            Some(rave) => {
+                let mv_iter = moves.into_iter();
+
+                if rave.rave_jitter == 0. {
+                    mv_iter.ord_subset_max_by_key(|mv| rave.get_rave(game.turn, *mv))
+                } else {
+                    let jitter = rave.rave_jitter;
+                    mv_iter.ord_subset_max_by_key(|mv| {
+                        rave.get_rave(game.turn, *mv) + rng.gen_range(-jitter..jitter)
+                    })
+                }
             }
-        } else {
-            // TODO: use a better heuristic
-            moves.choose(rng).copied()
+            None => moves.choose(rng).copied(),
         };
 
         let mv = mv.expect("Rollout failed to find a valid move");
@@ -257,7 +263,10 @@ impl Edge {
         game.do_move(mv);
         let turn = game.turn;
         let (score, is_terminal) = Self::rollout(game, heuristics, depth + 1, rng);
-        heuristics.update_rave(turn, &mv, score);
+
+        if let Some(rave) = heuristics.rave.as_mut() {
+            rave.update_rave(turn, mv, score);
+        }
 
         (score, is_terminal)
     }
@@ -408,11 +417,12 @@ impl MonteCarloTree {
         self
     }
 
-    pub fn search_duration(&mut self, milliseconds: u128) {
+    pub fn search_duration(&mut self, milliseconds: u128) -> &mut Self {
         let start = std::time::Instant::now();
         while start.elapsed().as_millis() < milliseconds {
             self.search();
         }
+        self
     }
 
     /// Return the best move given the current state of search
@@ -464,10 +474,12 @@ mod test {
 
     #[test]
     fn test_bugged_board() {
-        let bugged = "6|02040509|0F0C0A||5A0823G0F15B0101A0406B0315G0805F0223A0104F0313F0112A0434G0711G0416D0C06F0700F0316C0421F0314A0136E0512G0A06G0602F092";
-        let game = Game::decode(bugged);
-        let mut tree = MonteCarloTree::new(game.unwrap());
-        tree.search_iterations(10000);
+        let game_seed = [167, 58, 224, 133, 94, 224, 76, 115];
+        let mcts_seed = [75, 110, 21, 180, 122, 69, 56, 3];
+
+        let game = Game::new_from_seed(game_seed);
+        let mut tree = MonteCarloTree::new_from_seed(game, mcts_seed);
+        tree.search_duration(1000);
     }
 
     #[test]

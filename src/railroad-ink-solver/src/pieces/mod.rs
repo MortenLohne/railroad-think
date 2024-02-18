@@ -10,6 +10,17 @@ pub enum Connection {
     Rail,
     None,
 }
+
+impl Connection {
+    pub fn is_none(self) -> bool {
+        matches!(self, Connection::None)
+    }
+
+    pub fn is_some(self) -> bool {
+        !self.is_none()
+    }
+}
+
 use super::board::placement::Orientation;
 use Connection::{None, Rail, Road};
 
@@ -61,6 +72,10 @@ impl Piece {
 
     pub fn is_optional(piece: u8) -> bool {
         piece >= 0x0a
+    }
+
+    pub fn is_special(piece: u8) -> bool {
+        0x0A < piece && piece < 0x10
     }
 
     pub fn get_networks(piece: u8, orientation: Orientation) -> [Option<[Connection; 4]>; 2] {
