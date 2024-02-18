@@ -57,6 +57,8 @@ impl EdgeStrategy {
         Self { model, device }
     }
 
+    /// # Panics
+    /// If the model cannot be saved
     #[must_use]
     pub fn load(model_name: &str) -> Self {
         let device: Cpu = dfdx::tensor::Cpu::default();
@@ -248,7 +250,7 @@ impl Dataset {
 
         let features = boards
             .into_iter()
-            .zip(moves.into_iter())
+            .zip(moves)
             .map(|(board, mv)| EdgeStrategy::get_features(&board, mv, device))
             .collect();
 
@@ -302,7 +304,7 @@ impl Dataset {
         let mut features_data = Vec::with_capacity(B * 588);
         let mut labels_data = Vec::with_capacity(B);
 
-        for &index in indices.iter() {
+        for &index in &indices {
             features_data.extend(self.features.get(index).unwrap().array().iter().copied());
             labels_data.extend(self.labels.get(index).unwrap().array().iter().copied());
         }

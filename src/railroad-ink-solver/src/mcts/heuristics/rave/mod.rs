@@ -107,7 +107,7 @@ impl Rave {
     pub fn update_rave(&mut self, turn: u8, mv: Move, score: f64) {
         self.local_rave
             .entry((turn, mv))
-            .or_insert_with(Value::default)
+            .or_default()
             .update(score as i32);
     }
 }

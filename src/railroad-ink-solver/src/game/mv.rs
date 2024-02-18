@@ -81,7 +81,7 @@ impl FromStr for Move {
             }
             _ if input.starts_with("Place") => {
                 let payload = String::from(input)[6..input.len() - 1].to_string();
-                let placement = Placement::from_str(payload.as_str()).unwrap_or_else(|_| {
+                let placement = Placement::from_str(payload.as_str()).unwrap_or_else(|()| {
                     panic!("Move::Place Placement parse failed. Got {}", payload)
                 });
                 Ok(Self::Place(placement))

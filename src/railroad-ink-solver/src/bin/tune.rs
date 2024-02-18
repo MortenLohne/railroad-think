@@ -1,4 +1,4 @@
-use railroad_ink_solver::mcts::trainer::simulated_annealing;
+// use railroad_ink_solver::mcts::trainer::simulated_annealing;
 
 fn main() {
     // Run the simulated annealing algorithm_

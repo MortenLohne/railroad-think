@@ -32,6 +32,7 @@ impl BoardController {
     }
 
     #[must_use]
+    /// # Panics
     /// Panics if serde can't serialize
     pub fn decode(string: &JsValue) -> Self {
         Self {
@@ -40,19 +41,25 @@ impl BoardController {
     }
 
     #[must_use]
+    /// # Panics
     /// Panics if serde can't serialize
     pub fn get(&self) -> JsValue {
         JsValue::from_serde(&self.board).unwrap()
     }
 
     #[wasm_bindgen(js_name = findPossible)]
+    /// # Panics
     /// Panics if serde can't serialize
+    ///
+    /// # Errors
+    /// Returns an error if the piece can't be found
     pub fn find_possible(&self, piece: u8) -> Result<JsValue, JsValue> {
         let candidates = self.board.find_possible(piece);
         Ok(JsValue::from_serde(&candidates).unwrap())
     }
 
     #[wasm_bindgen(js_name = place)]
+    /// # Panics
     /// Panics if serde can't serialize
     pub fn place(&mut self, placement: &JsValue) {
         self.board.place(placement.into_serde().unwrap());

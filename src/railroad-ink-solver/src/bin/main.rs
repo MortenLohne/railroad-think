@@ -1,7 +1,7 @@
 use game::Game;
 use mcts::heuristics::Heuristics;
 use mcts::MonteCarloTree;
-use railroad_ink_solver::mcts::trainer::{generate_training_data, simulated_annealing};
+use railroad_ink_solver::mcts::trainer::simulated_annealing;
 use railroad_ink_solver::*;
 use std::thread;
 

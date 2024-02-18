@@ -34,7 +34,11 @@ impl GameController {
         self.game.encode()
     }
 
+    /// # Panics
     /// Panics if serde can't deserialize
+    ///
+    /// # Errors
+    /// Returns an error if the string can't be decoded
     pub fn decode(&mut self, string: &JsValue) -> Result<bool, JsValue> {
         match Game::decode(string.into_serde::<String>().unwrap().as_str()) {
             Err(message) => Err(JsValue::from_serde(&message).unwrap()),
@@ -47,6 +51,7 @@ impl GameController {
     }
 
     #[must_use]
+    /// # Panics
     /// Panics if serde can't serialize
     pub fn get(&self) -> JsValue {
         // FIXME: this doesn't work in wasm-land.
@@ -54,6 +59,7 @@ impl GameController {
         JsValue::from_serde(&self.game).unwrap()
     }
 
+    /// # Panics
     /// Panics if serde can't serialize
     pub fn roll(&mut self) -> JsValue {
         let pieces = self.game.roll();
@@ -62,13 +68,18 @@ impl GameController {
 
     #[must_use]
     #[wasm_bindgen(js_name = findPossible)]
+    /// # Panics
     /// Panics if serde can't serialize
     pub fn find_possible(&self, piece: u8) -> JsValue {
         let candidates = self.game.board.find_possible(piece);
         JsValue::from_serde(&candidates).unwrap()
     }
 
+    /// # Panics
     /// Panics if serde can't serialize
+    ///
+    /// # Errors
+    /// Returns an error if the piece can't be found
     pub fn place(&mut self, placement: &JsValue) -> Result<u8, JsValue> {
         match self.game.place(placement.into_serde().unwrap()) {
             Ok(piece) => {
@@ -84,6 +95,7 @@ impl GameController {
         self.game.board.score()
     }
 
+    /// # Panics
     /// Panics if serde can't serialize
     pub fn search(&mut self) -> JsValue {
         if self.mcts.is_none() {
@@ -96,6 +108,7 @@ impl GameController {
     }
 
     #[wasm_bindgen(js_name = searchFor)]
+    /// # Panics
     /// Panics if serde can't serialize
     pub fn search_for(&mut self, iterations: u32) -> JsValue {
         if self.mcts.is_none() {

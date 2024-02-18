@@ -102,8 +102,9 @@ impl Board {
         self.placed
             .iter()
             .filter_map(|idx| self[idx])
-            .map(|placement| format!("{placement:?}"))
-            .collect::<String>()
+            .fold(String::new(), |acc, placement| {
+                acc + &format!("{placement:?}")
+            })
     }
 
     #[inline]
@@ -209,7 +210,7 @@ impl Board {
             if self.has(square) {
                 continue;
             }
-            for &(direction, connection) in arr.iter() {
+            for &(direction, connection) in arr {
                 for orientation in piece.get_permutations() {
                     let piece = piece.permute(orientation);
 
@@ -355,7 +356,7 @@ impl Board {
                 }
             }
 
-            self.frontier.entry(square).or_insert_with(Vec::new);
+            self.frontier.entry(square).or_default();
 
             if let Some(frontier) = self.frontier.get_mut(&square) {
                 frontier.push((direction.inverse(), connection));
@@ -504,7 +505,7 @@ impl Board {
     ) -> Vec<Square<BOARD_SIZE>> {
         let mut longest = None;
 
-        for &loc in end_nodes.iter() {
+        for &loc in end_nodes {
             // If `loc` is not a placed tile, continue,
             // If  place has no `connection`-type connections, continue
             match self.get(loc) {

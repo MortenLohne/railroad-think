@@ -10,6 +10,9 @@ use std::thread;
 #[must_use]
 /// Test random heuristic values until we find good ones.
 /// Log the results of each option somwhere so we have history.
+///
+/// # Panics
+/// Panics if the file cannot be opened to save the heuristics
 pub fn simulated_annealing(
     max_iterations: u32,
     initial_temperature: f64,
@@ -119,7 +122,7 @@ pub fn play(heuristics: Heuristics) -> i32 {
     let game_seed = rng.gen();
     let mcts_seed = rng.gen();
 
-    println!("{game_seed:?} {mcts_seed:?}");
+    // println!("{game_seed:?} {mcts_seed:?}");
 
     let mut game = Game::new_from_seed(game_seed);
     let mut mcts = MonteCarloTree::new_from_seed(game.clone(), mcts_seed);
