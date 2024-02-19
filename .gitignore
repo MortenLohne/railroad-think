@@ -9,3 +9,5 @@ benches/data
 src/mcts/heuristics/training
 log.txt
 **/*.npz
+data/
+training_data.csv
