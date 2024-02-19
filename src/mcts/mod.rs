@@ -198,6 +198,10 @@ impl Edge {
 
     /// Does random moves until `game.ended`
     /// Returns `(score, depth_zero_is_terminal)`
+    ///
+    /// ### Ideas:
+    /// * Use heuristics instead of random moves
+    /// * Drop rollouts and just use the heuristic to estimate the score
     fn rollout(
         mut game: Game,
         heuristics: &mut Heuristics,
@@ -208,19 +212,11 @@ impl Edge {
             return (f64::from(game.board.score()), depth == 0);
         }
 
-        // TODO: Find out why this breaks the tests 👇
-        // let mv = heuristics.select_rollout_move(&game, game.generate_moves().clone());
         let mv = game
             .generate_moves()
             .choose(rng)
             .copied()
             .expect("Rollout failed to find a valid move");
-
-        // if let Some(nn) = &heuristics.move_nn {
-        //     if depth > 16 {
-        //         return (nn.predict(&game.board, &mv) as f64, true);
-        //     }
-        // }
 
         game.do_move(mv);
         let turn = game.turn;
