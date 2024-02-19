@@ -216,6 +216,12 @@ impl Edge {
             .copied()
             .expect("Rollout failed to find a valid move");
 
+        // if let Some(nn) = &heuristics.move_nn {
+        //     if depth > 16 {
+        //         return (nn.predict(&game.board, &mv) as f64, true);
+        //     }
+        // }
+
         game.do_move(mv);
         let turn = game.turn;
         let (score, is_terminal) = Self::rollout(game, heuristics, depth + 1, rng);

@@ -136,7 +136,7 @@ impl Heuristics {
             // rave,
             tree_reuse: true,
             // move_nn: None,
-            move_nn: Some(NeuralNetwork::load("model-16-16")),
+            move_nn: Some(NeuralNetwork::load("model-2")),
         }
     }
 
@@ -313,7 +313,7 @@ impl Heuristics {
 
         let ucb = mean_score;
         let exploration_bias = self.exploration_bias(turn);
-        let exploration = if visits == 0 {
+        let exploration: f64 = if visits == 0 {
             // self.get_rollout_policy_value(game, mv)
             self.parameters.unexplored_value[turn]
         } else {
@@ -324,8 +324,13 @@ impl Heuristics {
 
         let exploration_term = exploration_term + self.special_use(turn, mv);
 
-        if self.move_nn.is_some() {
-            let q = self.get_rollout_policy_value(game, mv);
+        if let Some(nn) = &self.move_nn {
+            let k = 5.; // Increase k to weigh the neural network more heavily
+
+            let predicted_value = f64::from(nn.predict(&game.board, &mv));
+            let n = visits as f64;
+            let beta = (k / 3.0f64.mul_add(n, k)).sqrt();
+            let q = (1.0 - beta).mul_add(ucb, beta * predicted_value);
             q + exploration_term
         } else if let Some(rave) = self.rave.as_ref() {
             let k = 1.;

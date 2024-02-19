@@ -7,6 +7,8 @@ use indicatif::ProgressBar;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::thread;
+
+use super::heuristics::nn::edge_strategy::EdgeStrategy;
 #[must_use]
 /// Test random heuristic values until we find good ones.
 /// Log the results of each option somwhere so we have history.
@@ -140,22 +142,23 @@ pub fn play(heuristics: Heuristics) -> i32 {
 /// Generate training data for the neural network
 /// # Panics
 /// Panics if the file cannot be opened
-pub fn generate_training_data(samples: u64, search_duration: u128) {
+pub fn generate_training_data(samples: u64, iterations: u64) {
     let mut rng = rand::thread_rng();
 
     let bar = ProgressBar::new(samples);
+    bar.inc(0);
     for _ in 0..samples {
         let game_seed = rng.gen();
         let mcts_seed = rng.gen();
 
         let mut game = Game::new_from_seed(game_seed);
         let mut mcts = MonteCarloTree::new_from_seed(game.clone(), mcts_seed);
+        mcts.heuristics.move_nn = Some(EdgeStrategy::load("model-2"));
 
         let mut data: Vec<(String, String)> = Vec::new();
-        bar.inc(1);
 
         while !game.ended {
-            mcts.search_duration(search_duration);
+            mcts.search_duration(iterations as u128);
             let mv = mcts.best_move();
             data.push((game.board.encode(), format!("{mv:?}")));
             mcts = MonteCarloTree::progress(mcts, mv, &mut game);
@@ -179,6 +182,9 @@ pub fn generate_training_data(samples: u64, search_duration: u128) {
         if let Err(e) = writeln!(file, "{data}") {
             eprintln!("Couldn't write to file: {e}");
         }
+
+        bar.println(format!("Score: {score}"));
+        bar.inc(1);
     }
     bar.finish_and_clear();
 }

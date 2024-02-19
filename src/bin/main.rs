@@ -4,30 +4,78 @@ use clap::{Args, Parser};
 use game::Game;
 use mcts::heuristics::Heuristics;
 use mcts::MonteCarloTree;
-use railroad_ink_solver::mcts::trainer::simulated_annealing;
+// use railroad_ink_solver::mcts::trainer::simulated_annealing;
 use railroad_ink_solver::*;
 use std::thread;
 
 #[derive(Parser)] // requires `derive` feature
 enum Cli {
     NN(NeuralNetworkArgs),
+    Play(PlayArgs),
 }
 
 #[derive(Args)]
 struct NeuralNetworkArgs {
-    /// Name of the person to greet
-    #[arg(short, long)]
+    #[arg(short, long, default_value_t = true)]
     train: bool,
+
+    #[arg(short, long)]
+    generate_training_data: bool,
+
+    #[arg(short, long)]
+    loop_training: bool,
+}
+
+#[derive(Args, Debug)]
+struct PlayArgs {
+    #[arg(long, default_value = "1")]
+    count: u32,
+
+    #[arg(short, long, default_value = "1000")]
+    duration: Option<u128>,
+
+    #[arg(short, long)]
+    iterations: Option<u64>,
 }
 
 fn main() {
-    let Cli::NN(args) = Cli::parse();
-    if args.train {
-        // let path = "./src/mcts/heuristics/heuristics.csv";
-        // let heuristics = Heuristics::from_csv(path);
-        // generate_training_data(100, 1000);
-        let mut model = mcts::heuristics::nn::edge_strategy::EdgeStrategy::create_model();
-        model.train_model_path("2024-test");
+    match Cli::parse() {
+        Cli::NN(args) => {
+            let mut initial_run = true;
+
+            while args.loop_training || initial_run {
+                initial_run = false;
+
+                if args.generate_training_data {
+                    let samples = 5;
+                    let iterations = 200;
+                    mcts::trainer::generate_training_data(samples, iterations);
+                }
+
+                if args.train {
+                    let mut model =
+                        mcts::heuristics::nn::edge_strategy::EdgeStrategy::load("model-2");
+                    model.train_model_path("model-2", 100);
+                }
+            }
+        }
+        Cli::Play(args) => {
+            let play_mode = if let Some(iterations) = args.iterations {
+                PlayMode::Iterations(iterations)
+            } else {
+                PlayMode::Duration(args.duration.unwrap())
+            };
+
+            let handles = run(args.count as u8, play_mode);
+            for handle in handles {
+                let (n, score) = handle.join().unwrap();
+
+                match play_mode {
+                    PlayMode::Iterations(_) => println!("iterations: {n}, score: {score}"),
+                    PlayMode::Duration(_) => println!("duration: {n}, score: {score}"),
+                }
+            }
+        }
     }
 
     // // Run the simulated annealing algorithm_
@@ -48,7 +96,6 @@ fn main() {
 
     // let path = "./src/mcts/heuristics/heuristics.csv";
     // let heuristics = Heuristics::from_csv(path);
-    // generate_training_data(100, 1000);
 
     // use mcts::heuristics::nn::edge_strategy::EdgeStrategy;
     // let mut nn = EdgeStrategy::create_model();
@@ -59,26 +106,35 @@ fn main() {
 
 /// Play `n` games
 /// Spawns a thread for each `n`
-/// Each thread returns iterations and score
-pub fn run(n: u8, duration: u128) -> Vec<thread::JoinHandle<(u128, i32)>> {
+/// Each thread returns play mode stats and score
+fn run(n: u8, play_mode: PlayMode) -> Vec<thread::JoinHandle<(u64, i32)>> {
     (0..n)
-        .map(|_| thread::spawn(move || play(duration)))
+        .map(|_| thread::spawn(move || play(play_mode)))
         .collect()
 }
 
+#[derive(Copy, Clone)]
+enum PlayMode {
+    Iterations(u64),
+    Duration(u128),
+}
+
 /// Play single game
-/// Returns iterations and score
-pub fn play(duration: u128) -> (u128, i32) {
+/// Returns duration or iteration and score
+fn play(play_mode: PlayMode) -> (u64, i32) {
     let mut game = Game::new();
 
     let heuristics = Heuristics::default();
     let mut mcts = MonteCarloTree::new_with_heuristics(game.clone(), heuristics);
 
     use mcts::heuristics::nn::edge_strategy::EdgeStrategy;
-    let nn = EdgeStrategy::load("model-dropout");
+    let nn = EdgeStrategy::load("model-2");
 
     while !game.ended {
-        let mv = mcts.search_duration(duration).best_move();
+        let mv = match play_mode {
+            PlayMode::Iterations(iterations) => mcts.search_iterations(iterations).best_move(),
+            PlayMode::Duration(duration) => mcts.search_duration(duration).best_move(),
+        };
 
         println!("{mv}, pred: {:.1}", nn.predict(&game.board, &mv));
         mcts = MonteCarloTree::progress(mcts, mv, &mut game);
@@ -86,7 +142,10 @@ pub fn play(duration: u128) -> (u128, i32) {
 
     println!("Score: {}", game.board.score());
 
-    (duration, game.board.score())
+    match play_mode {
+        PlayMode::Iterations(iterations) => (iterations, game.board.score()),
+        PlayMode::Duration(duration) => (duration as u64, game.board.score()),
+    }
 }
 
 /// Play single game

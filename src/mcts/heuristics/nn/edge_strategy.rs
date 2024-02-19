@@ -20,6 +20,8 @@ use indicatif::ProgressBar;
 use std::{io::Read, time::Instant};
 
 use dfdx::{data::IteratorBatchExt, losses::mse_loss, optim::Adam, prelude::*, tensor::Cpu};
+use rand::prelude::*;
+use rand::Rng;
 const MODEL_PATH: &str = "./src/mcts/heuristics/nn";
 
 // #[cfg(feature = "nightly")]
@@ -88,27 +90,27 @@ impl EdgeStrategy {
     }
 
     pub fn train_model(&mut self) {
-        self.train_model_path("model");
+        self.train_model_path("model", 5000);
     }
 
     /// # Panics
     /// If the model cannot be saved
-    pub fn train_model_path(&mut self, model_path: &str) {
+    pub fn train_model_path(&mut self, model_path: &str, epochs: u64) {
         let device: Cpu = Cpu::default();
-
-        let mut rng = rand::thread_rng();
 
         let mut optimizer: Adam<BuildModel, f32, Cpu> =
             dfdx::optim::Adam::new(&self.model, Default::default());
         let mut grads = self.model.alloc_grads();
         let dataset = Dataset::load(&device);
 
-        for i_epoch in 0..5000 {
+        let total_bar = ProgressBar::new(epochs);
+        for i_epoch in 0..epochs {
+            total_bar.inc(1);
             let mut total_epoch_loss = 0.0;
             let mut num_batches = 0;
             let start = Instant::now();
             let feature_count = dataset.features.len();
-            let bar = ProgressBar::new(feature_count as u64);
+            // let bar = ProgressBar::new(feature_count as u64);
             let subsets = (0..feature_count).batch_exact(Const::<BATCH_SIZE>);
 
             for (features, labels) in
@@ -119,29 +121,36 @@ impl EdgeStrategy {
 
                 total_epoch_loss += loss.array();
                 num_batches += 1;
-                bar.inc(BATCH_SIZE as u64);
+                // bar.inc(BATCH_SIZE as u64);
 
                 grads = loss.backward();
                 optimizer.update(&mut self.model, &grads).unwrap();
                 self.model.zero_grads(&mut grads);
             }
             let dur = start.elapsed();
-            bar.finish_and_clear();
 
-            println!(
+            // println!(
+            //     "Epoch {i_epoch:03} in {:.2} ms ({:.2} batches/s): avg sample loss {:.3}",
+            //     dur.as_millis(),
+            //     num_batches as f32 / dur.as_secs_f32(),
+            //     total_epoch_loss / num_batches as f32,
+            // );
+
+            total_bar.println(format!(
                 "Epoch {i_epoch:03} in {:.2} ms ({:.2} batches/s): avg sample loss {:.3}",
                 dur.as_millis(),
                 num_batches as f32 / dur.as_secs_f32(),
                 total_epoch_loss / num_batches as f32,
-            );
+            ));
 
-            if (i_epoch + 1) % 250 == 0 {
+            if (i_epoch + 1) % 250 == 0 || i_epoch == epochs - 1 {
                 println!("saving");
                 self.model
                     .save(format!("{MODEL_PATH}/{model_path}.npz"))
                     .expect("failed to save model");
             }
         }
+        total_bar.finish_and_clear();
     }
 
     // #[cfg(feature = "nightly")]
@@ -216,6 +225,9 @@ impl EdgeStrategy {
         features
     }
 
+    /// This function returns a 12-length array of features for a placement.
+    /// The array is structured as follows:
+    /// flat( [north, east, south, west] * [road, rail, current] )
     fn get_features_for_placement(placement: Placement) -> [f32; 12] {
         let mut cell = [0.0; 12];
         placement
@@ -252,7 +264,18 @@ impl Dataset {
         let mut file = std::fs::File::open("./src/mcts/heuristics/nn/training_data.csv").unwrap();
         let mut contents = String::new();
         file.read_to_string(&mut contents).unwrap();
-        for line in contents.lines() {
+        let total = contents.lines().count();
+        let mut rng = thread_rng();
+
+        for (i, line) in contents.lines().enumerate() {
+            // This is a way to sample the data
+            // so that lines later in the file are more likely to be included
+            let line_pct = i as f32 / total as f32;
+
+            if rng.gen::<f32>() > line_pct {
+                continue;
+            }
+
             let mut parts = line.split(',');
             let board = parts.next().unwrap();
             let mv = parts.next().unwrap();
@@ -278,37 +301,37 @@ impl Dataset {
         Self { features, labels }
     }
 
-    #[cfg(feature = "nightly")]
-    pub fn get_batch<const B: usize>(
-        &self,
-        device: &Device,
-        indices: [usize; B],
-    ) -> (Tensor<Rank4<B, 7, 7, 7>>, Tensor<Rank2<B, 1>>) {
-        let mut features_data = Vec::with_capacity(B * 7 * 7 * 7);
-        let mut labels_data = Vec::with_capacity(B * 1);
+    // #[cfg(feature = "nightly")]
+    // pub fn get_batch<const B: usize>(
+    //     &self,
+    //     device: &Device,
+    //     indices: [usize; B],
+    // ) -> (Tensor<Rank4<B, 7, 7, 7>>, Tensor<Rank2<B, 1>>) {
+    //     let mut features_data = Vec::with_capacity(B * 7 * 7 * 7);
+    //     let mut labels_data = Vec::with_capacity(B * 1);
 
-        for &index in indices.iter() {
-            features_data.extend(
-                self.features
-                    .get(index)
-                    .unwrap()
-                    .array()
-                    .iter()
-                    .flatten()
-                    .flatten()
-                    .copied(),
-            );
-            labels_data.extend(self.labels.get(index).unwrap().array().iter().copied());
-        }
+    //     for &index in indices.iter() {
+    //         features_data.extend(
+    //             self.features
+    //                 .get(index)
+    //                 .unwrap()
+    //                 .array()
+    //                 .iter()
+    //                 .flatten()
+    //                 .flatten()
+    //                 .copied(),
+    //         );
+    //         labels_data.extend(self.labels.get(index).unwrap().array().iter().copied());
+    //     }
 
-        let mut features = device.zeros();
-        features.copy_from(&features_data);
-        let mut labels = device.zeros();
-        labels.copy_from(&labels_data);
-        (features, labels)
-    }
+    //     let mut features = device.zeros();
+    //     features.copy_from(&features_data);
+    //     let mut labels = device.zeros();
+    //     labels.copy_from(&labels_data);
+    //     (features, labels)
+    // }
 
-    #[cfg(not(feature = "nightly"))]
+    // #[cfg(not(feature = "nightly"))]
     pub fn get_batch<const B: usize>(
         &self,
         device: &Device,
