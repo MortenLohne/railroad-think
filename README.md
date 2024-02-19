@@ -2,7 +2,7 @@
 
 [Railroad Ink](https://horribleguild.com/product-tag/railroad-ink/) is a game where you draw roads and railways on a grid. You get points for connecting exits, creating unbroken roads and railways, using the center of the board, and you lose points for open paths. The game is played over 7 rounds, and at the start of every round you roll dice to see the roads and railways you must draw.
 
-This is a program that plays that game. It uses a Monte Carlo Tree Search to evaluate moves, and a neural network to evaluate the board state.
+This is a program that plays that game. It uses a [Monte Carlo Tree Search](https://www.youtube.com/watch?v=UXW2yZndl7U) to evaluate moves, and a neural network to evaluate the board state. It uses [tree pruning](https://ceur-ws.org/Vol-2862/paper27.pdf) to reduce the size of the tree it needs to search. I did try to use [Rapid Action Value Estimation](https://www.cs.utexas.edu/~pstone/Courses/394Rspring11/resources/mcrave.pdf) to evaluate the board state, but I think my implementation was bad, and it didn't work very well.
 
 Inspired by [Tiltak](https://github.com/MortenLohne/tiltak), an AI for the board game Tak.
 
