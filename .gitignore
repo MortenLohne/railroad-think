@@ -11,3 +11,4 @@ log.txt
 **/*.npz
 data/
 training_data.csv
+.DS_Store
