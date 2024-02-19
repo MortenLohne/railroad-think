@@ -1,6 +1,6 @@
 # A Railroad Ink bot
 
-Railroad Ink is a game where you draw roads and railways on a grid. You get points for connecting exits, creating unbroken roads and railways, using the center of the board, and you lose points for open paths. The game is played over 7 rounds, and at the start of every round you roll dice to see the roads and railways you must draw.
+[Railroad Ink](https://horribleguild.com/product-tag/railroad-ink/) is a game where you draw roads and railways on a grid. You get points for connecting exits, creating unbroken roads and railways, using the center of the board, and you lose points for open paths. The game is played over 7 rounds, and at the start of every round you roll dice to see the roads and railways you must draw.
 
 This is a program that plays that game. It uses a Monte Carlo Tree Search to evaluate moves, and a neural network to evaluate the board state.
 
