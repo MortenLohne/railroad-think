@@ -8,6 +8,8 @@ use mcts::MonteCarloTree;
 use railroad_ink_solver::*;
 use std::thread;
 
+use rand::prelude::*;
+
 #[derive(Parser)] // requires `derive` feature
 enum Cli {
     NN(NeuralNetworkArgs),
@@ -36,6 +38,54 @@ struct PlayArgs {
 
     #[arg(short, long)]
     iterations: Option<u64>,
+
+    #[arg(short, long)]
+    loop_play: bool,
+}
+
+fn poisson(lambda: f64) -> f64 {
+    let mut rng = rand::thread_rng();
+
+    let k = poisson_lambda(lambda); // Generate Poisson-distributed integer
+    let u = rng.gen::<f64>(); // Generate uniform random number between 0 and 1
+
+    lambda + (k as f64 + u - lambda) / lambda
+}
+
+fn poisson_lambda(lambda: f64) -> u32 {
+    let mut rng = rand::thread_rng();
+    let mut k = 0;
+    let l = (-lambda).exp();
+    let mut p = 1.0;
+    let mut k = 0;
+
+    loop {
+        k += 1;
+
+        let u = rng.gen::<f64>(); // Generate uniform random number between 0 and 1
+        p *= u;
+
+        if p <= l {
+            break;
+        }
+    }
+
+    k - 1
+}
+
+fn chaos_random() -> u128 {
+    let mut rng = rand::thread_rng();
+
+    let lambda = 1.4; // Poisson parameter
+    let use_poisson = rng.gen_bool(0.75);
+
+    let sample = if use_poisson {
+        poisson(lambda)
+    } else {
+        rng.gen_range(0.01..2.0) * rng.gen_range(0.01..2.0)
+    } * 1000.;
+
+    sample.abs() as u128
 }
 
 fn main() {
@@ -60,19 +110,27 @@ fn main() {
             }
         }
         Cli::Play(args) => {
-            let play_mode = if let Some(iterations) = args.iterations {
-                PlayMode::Iterations(iterations)
-            } else {
-                PlayMode::Duration(args.duration.unwrap())
-            };
+            let mut initial_run = true;
 
-            let handles = run(args.count as u8, play_mode);
-            for handle in handles {
-                let (n, score) = handle.join().unwrap();
+            while args.loop_play || initial_run {
+                initial_run = false;
 
-                match play_mode {
-                    PlayMode::Iterations(_) => println!("iterations: {n}, score: {score}"),
-                    PlayMode::Duration(_) => println!("duration: {n}, score: {score}"),
+                // let play_mode = PlayMode::Duration(20);
+                let play_mode = PlayMode::Duration(chaos_random());
+                // let play_mode = if let Some(iterations) = args.iterations {
+                //     PlayMode::Iterations(iterations)
+                // } else {
+                //     PlayMode::Duration(args.duration.unwrap())
+                // };
+
+                let handles = run(args.count as u8, play_mode);
+                for handle in handles {
+                    let (n, score) = handle.join().unwrap();
+
+                    match play_mode {
+                        PlayMode::Iterations(_) => println!("iterations: {n}, score: {score}"),
+                        PlayMode::Duration(_) => println!("{n},{score}"),
+                    }
                 }
             }
         }
@@ -136,15 +194,13 @@ fn play(play_mode: PlayMode) -> (u64, i32) {
             PlayMode::Duration(duration) => mcts.search_duration(duration).best_move(),
         };
 
-        println!(
-            "{mv}, pred: {:.1}, depth: {}",
-            nn.predict(&game.board, &mv),
-            mcts.calculate_depth()
-        );
+        // println!(
+        //     "{mv}, pred: {:.1}, depth: {}",
+        //     nn.predict(&game.board, &mv),
+        //     mcts.calculate_depth()
+        // );
         mcts = MonteCarloTree::progress(mcts, mv, &mut game);
     }
-
-    println!("Score: {}", game.board.score());
 
     match play_mode {
         PlayMode::Iterations(iterations) => (iterations, game.board.score()),

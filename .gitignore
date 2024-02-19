@@ -12,3 +12,4 @@ log.txt
 data/
 training_data.csv
 .DS_Store
+.ipynb_checkpoints/
