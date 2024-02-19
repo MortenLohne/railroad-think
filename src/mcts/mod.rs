@@ -18,6 +18,16 @@ use crate::identity_hasher::BuildHasher;
 
 pub type Score = f64;
 
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+struct ComparableScore(Score);
+impl Ord for ComparableScore {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
+    }
+}
+
+impl Eq for ComparableScore {}
+
 #[derive(Debug, Serialize, Default)]
 pub struct Node {
     pub visits: u64,
@@ -81,6 +91,7 @@ pub struct Edge {
     pub visits: u64,
     pub mean_score: Score,
     pub child: Option<SingleOrMultiple>,
+    pub pruned: bool,
 }
 
 impl Edge {
@@ -91,6 +102,7 @@ impl Edge {
             child: None,
             visits: 0,
             mean_score: 0.,
+            pruned: false,
         }
     }
 
@@ -144,16 +156,24 @@ impl Edge {
 
         assert_ne!(node.children.len(), 0, "No legal moves!");
 
-        let mut best_exploration_value = Score::MIN;
-        let mut best_child_node_index = 0;
-        for (i, edge) in node.children.iter().enumerate() {
-            let child_exploration_value = edge.exploration_value(self.visits, heuristics, &game);
-            if child_exploration_value >= best_exploration_value {
-                best_child_node_index = i;
-                best_exploration_value = child_exploration_value;
-            }
+        let parent_visits = self.visits;
+        let mut children = node
+            .children
+            .iter()
+            .filter(|edge| !edge.pruned)
+            .map(|edge| edge.exploration_value(parent_visits, heuristics, &game))
+            .enumerate()
+            .collect::<Vec<_>>();
+
+        children.sort_unstable_by_key(|(_, val)| ComparableScore(-*val));
+
+        let max_children = 60; // TODO: discove this parameter
+        for (i, _) in children.iter().skip(max_children) {
+            let child = node.children.get_mut(*i).unwrap();
+            child.pruned = true;
         }
 
+        let best_child_node_index = children.first().unwrap().0;
         let child_edge = node.children.get_mut(best_child_node_index).unwrap();
 
         game.do_move(child_edge.mv);
@@ -279,6 +299,38 @@ impl MonteCarloTree {
             seed,
         }
     }
+
+    #[must_use]
+    pub fn calculate_depth(&self) -> u16 {
+        let mut depth = 0;
+        let mut edge = &self.root;
+        while let Some(child) = edge.child.as_ref() {
+            match child {
+                Single(node) => {
+                    if node.children.len() == 0 {
+                        break;
+                    }
+                    edge = node.children.iter().max_by_key(|edge| edge.visits).unwrap();
+                    depth += 1;
+                }
+                Multiple(nodes) => {
+                    let node = nodes.values().max_by_key(|node| node.visits);
+
+                    if let Some(node) = node {
+                        if node.children.len() == 0 {
+                            break;
+                        }
+                        edge = node.children.iter().max_by_key(|edge| edge.visits).unwrap();
+                        depth += 1;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+        depth
+    }
+
     /// # Panics
     /// This function panics if the move is not possible in this state of the game.
     pub fn progress(mut mcts: Self, mv: Move, game: &mut Game) -> Self {
@@ -338,6 +390,7 @@ impl MonteCarloTree {
                                                 visits: node.visits,
                                                 mean_score: node.visits as f64 / node.total_score,
                                                 child: Some(Single(node)),
+                                                pruned: false,
                                             },
                                         }
                                     }

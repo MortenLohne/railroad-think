@@ -136,7 +136,11 @@ fn play(play_mode: PlayMode) -> (u64, i32) {
             PlayMode::Duration(duration) => mcts.search_duration(duration).best_move(),
         };
 
-        println!("{mv}, pred: {:.1}", nn.predict(&game.board, &mv));
+        println!(
+            "{mv}, pred: {:.1}, depth: {}",
+            nn.predict(&game.board, &mv),
+            mcts.calculate_depth()
+        );
         mcts = MonteCarloTree::progress(mcts, mv, &mut game);
     }
 
