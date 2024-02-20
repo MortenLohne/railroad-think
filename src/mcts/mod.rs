@@ -156,6 +156,8 @@ impl Edge {
 
         assert_ne!(node.children.len(), 0, "No legal moves!");
 
+        let mut best_child_node_index = 0;
+
         let parent_visits = self.visits;
         let mut children = node
             .children
@@ -165,15 +167,47 @@ impl Edge {
             .enumerate()
             .collect::<Vec<_>>();
 
-        children.sort_unstable_by_key(|(_, val)| ComparableScore(-*val));
+        #[cfg(feature = "pruning")]
+        {
+            let n = node.children.len();
+            let t = 50;
+            let alpha = 4.0;
+            let remaining_nodes = (alpha * f64::from(n).ln()).max(t);
 
-        let max_children = 600; // TODO: discove this parameter
-        for (i, _) in children.iter().skip(max_children) {
-            let child = node.children.get_mut(*i).unwrap();
-            child.pruned = true;
+            if n > remaining_nodes {
+                children.sort_unstable_by_key(|(_, val)| ComparableScore(-*val));
+
+                for (i, _) in children.iter().skip(remaining_nodes) {
+                    let child = node.children.get_mut(*i).unwrap();
+                    child.pruned = true;
+                }
+                best_child_node_index = children.first().unwrap().0;
+            } else {
+                for (i, edge) in node.children.iter().enumerate() {
+                    let child_exploration_value =
+                        edge.exploration_value(self.visits, heuristics, &game);
+                    if child_exploration_value >= best_exploration_value {
+                        best_child_node_index = i;
+                        best_exploration_value = child_exploration_value;
+                    }
+                }
+            }
         }
 
-        let best_child_node_index = children.first().unwrap().0;
+        #[cfg(not(feature = "pruning"))]
+        {
+            let mut best_exploration_value = Score::MIN;
+
+            for (i, edge) in node.children.iter().enumerate() {
+                let child_exploration_value =
+                    edge.exploration_value(self.visits, heuristics, &game);
+                if child_exploration_value >= best_exploration_value {
+                    best_child_node_index = i;
+                    best_exploration_value = child_exploration_value;
+                }
+            }
+        }
+
         let child_edge = node.children.get_mut(best_child_node_index).unwrap();
 
         game.do_move(child_edge.mv);

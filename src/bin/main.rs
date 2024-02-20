@@ -76,7 +76,7 @@ fn poisson_lambda(lambda: f64) -> u32 {
 fn chaos_random() -> u128 {
     let mut rng = rand::thread_rng();
 
-    let lambda = 1.4; // Poisson parameter
+    let lambda = 0.5; // Poisson parameter
     let use_poisson = rng.gen_bool(0.75);
 
     let sample = if use_poisson {

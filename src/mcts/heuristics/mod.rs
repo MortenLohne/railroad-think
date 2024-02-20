@@ -24,8 +24,13 @@ pub struct Parameters {
     pub piece_locks_out_other_piece: [f64; 7],
     pub piece_is_2nd_order_neighbor: [f64; 7],
     pub piece_is_3rd_order_neighbor: [f64; 7],
+    pub prune_minimum_node_count: u16,
+    pub prune_alpha: f64,
+    pub model: String,
 }
 
+/// TODO: make "from_json" and "to_json", and make the appropriate json
+// https://docs.rs/serde_json/latest/serde_json/
 impl Parameters {
     #[must_use]
     /// Load the heuristic parameters from a csv file.
