@@ -167,7 +167,7 @@ impl Edge {
 
         children.sort_unstable_by_key(|(_, val)| ComparableScore(-*val));
 
-        let max_children = 60; // TODO: discove this parameter
+        let max_children = 600; // TODO: discove this parameter
         for (i, _) in children.iter().skip(max_children) {
             let child = node.children.get_mut(*i).unwrap();
             child.pruned = true;
