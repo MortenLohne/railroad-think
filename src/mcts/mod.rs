@@ -170,7 +170,7 @@ impl Edge {
         #[cfg(feature = "pruning")]
         {
             let n = node.children.len();
-            let t = heuristics.parameters.prune_minimum_node_count as f64;
+            let t = heuristics.parameters.prune_minimum_node_count.max(1) as f64;
             let alpha = heuristics.parameters.prune_alpha;
 
             let remaining_nodes = (alpha * (n as f64).ln()).max(t).ceil() as usize;

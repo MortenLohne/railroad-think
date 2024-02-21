@@ -4,6 +4,7 @@ use clap::{Args, Parser};
 use game::Game;
 use mcts::heuristics::Heuristics;
 use mcts::MonteCarloTree;
+use railroad_ink_solver::mcts::heuristics;
 use railroad_ink_solver::*;
 use std::thread;
 
@@ -40,6 +41,9 @@ struct PlayArgs {
 
     #[arg(short, long)]
     loop_play: bool,
+
+    #[arg(short, long)]
+    sample_duration: bool,
 }
 
 fn poisson(lambda: f64) -> f64 {
@@ -74,15 +78,17 @@ fn poisson_lambda(lambda: f64) -> u32 {
 fn chaos_random() -> u128 {
     let mut rng = rand::thread_rng();
 
-    let lambda = 0.5; // Poisson parameter
-    let use_poisson = rng.gen_bool(0.75);
+    // let lambda = 0.1; // Poisson parameter
+    // let use_poisson = rng.gen_bool(0.75);
 
-    let sample = if use_poisson {
-        poisson(lambda)
-    } else {
-        rng.gen_range(0.01..2.0) * rng.gen_range(0.01..2.0)
-    } * 1000.;
+    // let sample = if use_poisson {
+    // let sample = {
+    // poisson(lambda)
+    // } else {
+    // rng.gen_range(0.01..1.8) * rng.gen_range(0.01..1.8)
 
+    // }
+    let sample: f64 = rng.gen_range(0.001..1.0) * 2500.0;
     sample.abs() as u128
 }
 
@@ -113,21 +119,53 @@ fn main() {
             while args.loop_play || initial_run {
                 initial_run = false;
 
-                // let play_mode = PlayMode::Duration(20);
-                let play_mode = PlayMode::Duration(chaos_random());
-                // let play_mode = if let Some(iterations) = args.iterations {
-                //     PlayMode::Iterations(iterations)
-                // } else {
-                //     PlayMode::Duration(args.duration.unwrap())
-                // };
+                let play_mode = if args.sample_duration {
+                    PlayMode::Duration(chaos_random())
+                } else {
+                    if let Some(iterations) = args.iterations {
+                        PlayMode::Iterations(iterations)
+                    } else {
+                        PlayMode::Duration(args.duration.unwrap())
+                    }
+                };
 
-                let handles = run(args.count as u8, play_mode);
-                for handle in handles {
-                    let (n, score) = handle.join().unwrap();
+                let all_heuristics = vec![
+                    String::from("./config/heuristics-0-0.json"),
+                    String::from("./config/heuristics-0-4.json"),
+                    String::from("./config/heuristics-0-16.json"),
+                    String::from("./config/heuristics-0-64.json"),
+                    String::from("./config/heuristics-0-256.json"),
+                    String::from("./config/heuristics-20-0.json"),
+                    String::from("./config/heuristics-20-4.json"),
+                    String::from("./config/heuristics-20-16.json"),
+                    String::from("./config/heuristics-20-64.json"),
+                    String::from("./config/heuristics-20-256.json"),
+                    String::from("./config/heuristics-80-0.json"),
+                    String::from("./config/heuristics-80-4.json"),
+                    String::from("./config/heuristics-80-16.json"),
+                    String::from("./config/heuristics-80-64.json"),
+                    String::from("./config/heuristics-80-256.json"),
+                    String::from("./config/heuristics-200-0.json"),
+                    String::from("./config/heuristics-200-4.json"),
+                    String::from("./config/heuristics-200-16.json"),
+                    String::from("./config/heuristics-200-64.json"),
+                    String::from("./config/heuristics-200-256.json"),
+                    String::from("./config/heuristics-1000-0.json"),
+                    String::from("./config/heuristics-1000-4.json"),
+                    String::from("./config/heuristics-1000-16.json"),
+                    String::from("./config/heuristics-1000-64.json"),
+                    String::from("./config/heuristics-1000-256.json"),
+                ];
 
-                    match play_mode {
-                        PlayMode::Iterations(_) => println!("iterations: {n}, score: {score}"),
-                        PlayMode::Duration(_) => println!("{n},{score}"),
+                for heuristics in all_heuristics {
+                    let handles = run(args.count as u8, play_mode, heuristics.clone());
+                    for handle in handles {
+                        let (n, score) = handle.join().unwrap();
+
+                        match play_mode {
+                            PlayMode::Iterations(_) => println!("iterations: {n}, score: {score}"),
+                            PlayMode::Duration(_) => println!("{heuristics},{n},{score}"),
+                        }
                     }
                 }
             }
@@ -160,9 +198,10 @@ fn main() {
 /// Play `n` games
 /// Spawns a thread for each `n`
 /// Each thread returns play mode stats and score
-fn run(n: u8, play_mode: PlayMode) -> Vec<thread::JoinHandle<(u64, i32)>> {
+fn run(n: u8, play_mode: PlayMode, heuristics: String) -> Vec<thread::JoinHandle<(u64, i32)>> {
     (0..n)
-        .map(|_| thread::spawn(move || play(play_mode)))
+        .map(|_| heuristics.clone())
+        .map(|heuristics| thread::spawn(move || play(play_mode, heuristics)))
         .collect()
 }
 
@@ -174,10 +213,10 @@ enum PlayMode {
 
 /// Play single game
 /// Returns duration or iteration and score
-fn play(play_mode: PlayMode) -> (u64, i32) {
+fn play(play_mode: PlayMode, heuristics: String) -> (u64, i32) {
     let mut game = Game::new();
 
-    let heuristics = Heuristics::default();
+    let heuristics = Heuristics::from_json(heuristics.as_str()).expect("Could not parse json");
     let mut mcts = MonteCarloTree::new_with_heuristics(game.clone(), heuristics);
 
     // use mcts::heuristics::nn::edge_strategy::EdgeStrategy;
