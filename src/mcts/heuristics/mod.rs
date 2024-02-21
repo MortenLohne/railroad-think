@@ -13,8 +13,9 @@ use ord_subset::OrdSubsetIterExt;
 mod rave;
 
 pub type HeuristicOptions = [[f64; 7]; 8];
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Parameters {
     pub unexplored_value: [f64; 7],
     pub exploration_variables: [f64; 7],
@@ -90,6 +91,8 @@ impl Parameters {
         Ok(())
     }
 
+    pub fn to_json(&self)
+
     #[must_use]
     pub fn as_array(&self) -> [[f64; 7]; 8] {
         [
@@ -116,6 +119,9 @@ impl From<[[f64; 7]; 8]> for Parameters {
             piece_locks_out_other_piece: array[5],
             piece_is_2nd_order_neighbor: array[6],
             piece_is_3rd_order_neighbor: array[7],
+            prune_minimum_node_count: 60,
+            prune_alpha: 4.0,
+            model: String::from("model-2"),
         }
     }
 }
