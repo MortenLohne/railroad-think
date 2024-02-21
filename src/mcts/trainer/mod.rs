@@ -3,6 +3,7 @@ use rand::Rng;
 use crate::game::Game;
 use crate::mcts::heuristics::{HeuristicOptions, Heuristics};
 use crate::mcts::MonteCarloTree;
+use core::panic;
 use indicatif::ProgressBar;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
@@ -22,8 +23,8 @@ pub fn simulated_annealing(
     temperature_decay_rate: f64,
     variable: Option<usize>,
 ) -> HeuristicOptions {
-    let path = "./src/mcts/heuristics/heuristics.csv";
-    let mut heuristics = Heuristics::from_csv(path);
+    let path = "./config/heuristics.json";
+    let mut heuristics = Heuristics::from_json(path).expect("Error: Could not load heuristics");
     heuristics.rave = None;
     heuristics.move_nn = None;
     let heuristics = heuristics;
@@ -67,11 +68,12 @@ pub fn simulated_annealing(
         };
 
         if accept_change {
-            score = (new_score + score) / 2.0;
-            options[variable] = new_options[variable];
-            Heuristics::new(options.into())
-                .to_csv(format!("./src/mcts/heuristics/training/heuristics_{i:03}.csv").as_str())
-                .expect("Error: Could not save heuristics");
+            panic!("Accept change");
+            // score = (new_score + score) / 2.0;
+            // options[variable] = new_options[variable];
+            // Heuristics::new(options.into())
+            //     .to_csv(format!("./src/mcts/heuristics/training/heuristics_{i:03}.csv").as_str())
+            //     .expect("Error: Could not save heuristics");
         }
     }
     options
