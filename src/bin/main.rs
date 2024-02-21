@@ -4,7 +4,6 @@ use clap::{Args, Parser};
 use game::Game;
 use mcts::heuristics::Heuristics;
 use mcts::MonteCarloTree;
-// use railroad_ink_solver::mcts::trainer::simulated_annealing;
 use railroad_ink_solver::*;
 use std::thread;
 
@@ -54,7 +53,6 @@ fn poisson(lambda: f64) -> f64 {
 
 fn poisson_lambda(lambda: f64) -> u32 {
     let mut rng = rand::thread_rng();
-    let mut k = 0;
     let l = (-lambda).exp();
     let mut p = 1.0;
     let mut k = 0;
@@ -152,9 +150,6 @@ fn main() {
     // );
     // println!("heuristics: {heuristics:?}");
 
-    // let path = "./src/mcts/heuristics/heuristics.csv";
-    // let heuristics = Heuristics::from_csv(path);
-
     // use mcts::heuristics::nn::edge_strategy::EdgeStrategy;
     // let mut nn = EdgeStrategy::create_model();
     // nn.train_model_path("model-16-16");
@@ -185,8 +180,8 @@ fn play(play_mode: PlayMode) -> (u64, i32) {
     let heuristics = Heuristics::default();
     let mut mcts = MonteCarloTree::new_with_heuristics(game.clone(), heuristics);
 
-    use mcts::heuristics::nn::edge_strategy::EdgeStrategy;
-    let nn = EdgeStrategy::load("model-2");
+    // use mcts::heuristics::nn::edge_strategy::EdgeStrategy;
+    // let nn = EdgeStrategy::load("model-2");
 
     while !game.ended {
         let mv = match play_mode {
@@ -218,8 +213,6 @@ pub fn play_and_dump_rave_heuristics(iterations: u64, _i: u64) -> (u64, i32) {
         // use_rave: false,
         ..Default::default()
     };
-    // heuristics.load_local_rave("./src/mcts/heuristics/by_turn.csv");
-    // heuristics.uniform_local_rave(4);
 
     let mut mcts = MonteCarloTree::new_with_heuristics(game.clone(), heuristics);
 
@@ -228,10 +221,6 @@ pub fn play_and_dump_rave_heuristics(iterations: u64, _i: u64) -> (u64, i32) {
         println!("best move: {mv:?}");
         mcts = MonteCarloTree::progress(mcts, mv, &mut game);
     }
-
-    // mcts.heuristics
-    //     .dump_local_rave(format!("./data/rave/post_special_heuristics/iter_{i}.csv").as_str())
-    //     .unwrap();
 
     (iterations, game.board.score())
 }

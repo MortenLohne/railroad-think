@@ -170,9 +170,10 @@ impl Edge {
         #[cfg(feature = "pruning")]
         {
             let n = node.children.len();
-            let t = 50;
-            let alpha = 4.0;
-            let remaining_nodes = (alpha * f64::from(n).ln()).max(t);
+            let t = heuristics.parameters.prune_minimum_node_count as f64;
+            let alpha = heuristics.parameters.prune_alpha;
+
+            let remaining_nodes = (alpha * (n as f64).ln()).max(t).ceil() as usize;
 
             if n > remaining_nodes {
                 children.sort_unstable_by_key(|(_, val)| ComparableScore(-*val));
@@ -183,6 +184,8 @@ impl Edge {
                 }
                 best_child_node_index = children.first().unwrap().0;
             } else {
+                let mut best_exploration_value = Score::MIN;
+
                 for (i, edge) in node.children.iter().enumerate() {
                     let child_exploration_value =
                         edge.exploration_value(self.visits, heuristics, &game);

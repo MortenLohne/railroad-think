@@ -33,65 +33,40 @@ pub struct Parameters {
 /// TODO: make "from_json" and "to_json", and make the appropriate json
 // https://docs.rs/serde_json/latest/serde_json/
 impl Parameters {
-    #[must_use]
-    /// Load the heuristic parameters from a csv file.
-    ///
-    /// # Panics
-    /// Panics if the file cannot be opened or read.
-    pub fn from_csv(path: &str) -> Self {
-        let mut file = File::open(path).expect("Error loading Heuristics: Could not find path");
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)
-            .expect("Error loading Heuristics: Could not read file to string");
-
-        let mut lines = contents.lines();
-        // skip the header:
-        lines.next();
-
-        let mut parameters = Parameters::from([[0.0; 7]; 8]);
-
-        for i in 0..7 {
-            let line = lines.next().unwrap();
-            let mut values = line.split(',');
-            parameters.unexplored_value[i] = values.next().unwrap().parse().unwrap();
-            parameters.exploration_variables[i] = values.next().unwrap().parse().unwrap();
-            parameters.special_cost[i] = values.next().unwrap().parse().unwrap();
-            parameters.piece_connects_to_exit[i] = values.next().unwrap().parse().unwrap();
-            parameters.piece_connects_to_other_piece[i] = values.next().unwrap().parse().unwrap();
-            parameters.piece_locks_out_other_piece[i] = values.next().unwrap().parse().unwrap();
-            parameters.piece_is_2nd_order_neighbor[i] = values.next().unwrap().parse().unwrap();
-            parameters.piece_is_3rd_order_neighbor[i] = values.next().unwrap().parse().unwrap();
-        }
-
-        parameters
-    }
-
-    /// Save the heuristic parameters to a csv file.
+    /// Save the heuristic parameters to a json file.
     /// # Errors
     /// Returns an error if the file cannot be opened or written to.
-    pub fn to_csv(&self, path: &str) -> std::io::Result<()> {
+    pub fn to_json(&self, path: &str) -> std::io::Result<()> {
         let mut file = File::create(path)?;
-        let mut contents = String::new();
-
-        for turn in 0..7 {
-            contents.push_str(&format!(
-                "{},{},{},{},{},{},{},{}\r",
-                self.unexplored_value[turn],
-                self.exploration_variables[turn],
-                self.special_cost[turn],
-                self.piece_connects_to_exit[turn],
-                self.piece_connects_to_other_piece[turn],
-                self.piece_locks_out_other_piece[turn],
-                self.piece_is_2nd_order_neighbor[turn],
-                self.piece_is_3rd_order_neighbor[turn],
-            ));
-        }
-
+        let contents = serde_json::to_string(self)?;
         write!(file, "{contents}")?;
         Ok(())
     }
 
-    pub fn to_json(&self)
+    #[must_use]
+    /// Load the heuristic parameters from a json file.
+    ///
+    /// # Panics
+    /// Panics if the file cannot be read.
+    ///
+    /// # Errors
+    /// Returns an error if the file cannot be opened.
+    ///
+    pub fn from_json(path: &str) -> Result<Self, String> {
+        if let Ok(mut file) = File::open(path) {
+            let mut contents = String::new();
+
+            file.read_to_string(&mut contents)
+                .expect("Error loading Heuristics: Could not read file to string");
+
+            match serde_json::from_str(&contents) {
+                Ok(parameters) => Ok(parameters),
+                Err(e) => Err(format!("Error loading Heuristics: {}", e)),
+            }
+        } else {
+            Err("Error loading Heuristics: Could not find path".to_string())
+        }
+    }
 
     #[must_use]
     pub fn as_array(&self) -> [[f64; 7]; 8] {
@@ -138,34 +113,34 @@ impl Heuristics {
     #[must_use]
     pub fn new(parameters: Parameters) -> Self {
         // let mut rave = rave::Rave::new();
-        // rave.load_rave("./src/mcts/heuristics/rave/rave.csv");
         // let rave = Some(rave);
+        let move_nn = Some(NeuralNetwork::load(&parameters.model.clone()));
 
         Self {
             parameters,
+            move_nn,
             rave: None,
-            // rave,
             tree_reuse: true,
-            // move_nn: None,
-            move_nn: Some(NeuralNetwork::load("model-2")),
         }
     }
 
-    #[must_use]
-    pub fn from_csv(path: &str) -> Self {
-        Self {
-            parameters: Parameters::from_csv(path),
-            rave: None,
-            tree_reuse: true,
-            move_nn: None,
-        }
-    }
-
-    /// Export this instance of Heuristics to a `.csv`-file at the given `path`
+    /// Export this instance of Heuristics to a `.json`-file at the given `path`
     /// # Errors
     /// Erros if there was an error writing to the file
-    pub fn to_csv(self, path: &str) -> std::io::Result<()> {
-        self.parameters.to_csv(path)
+    /// # Panics
+    /// Panics if the file cannot be opened or written to.
+    pub fn to_json(self, path: &str) -> std::io::Result<()> {
+        self.parameters.to_json(path)
+    }
+
+    /// Import a Heuristics instance from a `.json`-file at the given `path`
+    /// # Errors
+    /// Returns an error if the file cannot be opened or read.
+    /// # Panics
+    /// Panics if the file cannot be read.
+    pub fn from_json(path: &str) -> Result<Self, String> {
+        let parameters = Parameters::from_json(path)?;
+        Ok(Self::new(parameters))
     }
 
     #[must_use]
@@ -366,6 +341,6 @@ impl Heuristics {
 
 impl Default for Heuristics {
     fn default() -> Self {
-        Self::new(Parameters::from_csv("./src/mcts/heuristics/parameters.csv"))
+        Self::from_json("./config/heuristics.json").expect("Could not load default heuristics")
     }
 }
