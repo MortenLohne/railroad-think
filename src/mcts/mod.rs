@@ -158,24 +158,23 @@ impl Edge {
 
         let mut best_child_node_index = 0;
 
-        let parent_visits = self.visits;
-        let mut children = node
-            .children
-            .iter()
-            .filter(|edge| !edge.pruned)
-            .map(|edge| edge.exploration_value(parent_visits, heuristics, &game))
-            .enumerate()
-            .collect::<Vec<_>>();
-
         #[cfg(feature = "pruning")]
         {
+            let parent_visits = self.visits;
+            let mut children = node
+                .children
+                .iter_mut()
+                .filter(|edge| !edge.pruned)
+                .map(|edge| edge.exploration_value(parent_visits, heuristics, &game))
+                .enumerate()
+                .collect::<Vec<_>>();
             let n = node.children.len();
             let t = heuristics.parameters.prune_minimum_node_count.max(1) as f64;
             let alpha = heuristics.parameters.prune_alpha;
 
             let remaining_nodes = (alpha * (n as f64).ln()).max(t).ceil() as usize;
 
-            if n > remaining_nodes {
+            if children.len() > remaining_nodes {
                 children.sort_unstable_by_key(|(_, val)| ComparableScore(-*val));
 
                 for (i, _) in children.iter().skip(remaining_nodes) {
@@ -186,7 +185,7 @@ impl Edge {
             } else {
                 let mut best_exploration_value = Score::MIN;
 
-                for (i, edge) in node.children.iter().enumerate() {
+                for (i, edge) in node.children.iter_mut().enumerate() {
                     let child_exploration_value =
                         edge.exploration_value(self.visits, heuristics, &game);
                     if child_exploration_value >= best_exploration_value {
@@ -201,7 +200,7 @@ impl Edge {
         {
             let mut best_exploration_value = Score::MIN;
 
-            for (i, edge) in node.children.iter().enumerate() {
+            for (i, edge) in node.children.iter_mut().enumerate() {
                 let child_exploration_value =
                     edge.exploration_value(self.visits, heuristics, &game);
                 if child_exploration_value >= best_exploration_value {

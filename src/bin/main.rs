@@ -4,7 +4,7 @@ use clap::{Args, Parser};
 use game::Game;
 use mcts::heuristics::Heuristics;
 use mcts::MonteCarloTree;
-use railroad_ink_solver::mcts::heuristics;
+// use railroad_ink_solver::mcts::heuristics;
 use railroad_ink_solver::*;
 use std::thread;
 
@@ -26,6 +26,9 @@ struct NeuralNetworkArgs {
 
     #[arg(short, long)]
     loop_training: bool,
+
+    #[arg(long)]
+    create_model: bool,
 }
 
 #[derive(Args, Debug)]
@@ -46,35 +49,6 @@ struct PlayArgs {
     sample_duration: bool,
 }
 
-fn poisson(lambda: f64) -> f64 {
-    let mut rng = rand::thread_rng();
-
-    let k = poisson_lambda(lambda); // Generate Poisson-distributed integer
-    let u = rng.gen::<f64>(); // Generate uniform random number between 0 and 1
-
-    lambda + (k as f64 + u - lambda) / lambda
-}
-
-fn poisson_lambda(lambda: f64) -> u32 {
-    let mut rng = rand::thread_rng();
-    let l = (-lambda).exp();
-    let mut p = 1.0;
-    let mut k = 0;
-
-    loop {
-        k += 1;
-
-        let u = rng.gen::<f64>(); // Generate uniform random number between 0 and 1
-        p *= u;
-
-        if p <= l {
-            break;
-        }
-    }
-
-    k - 1
-}
-
 fn chaos_random() -> u128 {
     let mut rng = rand::thread_rng();
 
@@ -88,7 +62,7 @@ fn chaos_random() -> u128 {
     // rng.gen_range(0.01..1.8) * rng.gen_range(0.01..1.8)
 
     // }
-    let sample: f64 = rng.gen_range(0.001..1.0) * 2500.0;
+    let sample: f64 = rng.gen_range(0.001..1.0) * rng.gen_range(0.001..1.0) * 2000.0;
     sample.abs() as u128
 }
 
@@ -96,6 +70,12 @@ fn main() {
     match Cli::parse() {
         Cli::NN(args) => {
             let mut initial_run = true;
+
+            let mut model = if args.create_model {
+                mcts::heuristics::nn::edge_strategy::EdgeStrategy::create_model()
+            } else {
+                mcts::heuristics::nn::edge_strategy::EdgeStrategy::load("model-2")
+            };
 
             while args.loop_training || initial_run {
                 initial_run = false;
@@ -107,8 +87,8 @@ fn main() {
                 }
 
                 if args.train {
-                    let mut model =
-                        mcts::heuristics::nn::edge_strategy::EdgeStrategy::load("model-2");
+                    // let mut model =
+                    //     mcts::heuristics::nn::edge_strategy::EdgeStrategy::load("model-2");
                     model.train_model_path("model-2", 100);
                 }
             }
@@ -129,45 +109,26 @@ fn main() {
                     }
                 };
 
-                let all_heuristics = vec![
-                    String::from("./config/heuristics-0-0.json"),
-                    String::from("./config/heuristics-0-4.json"),
-                    String::from("./config/heuristics-0-16.json"),
-                    String::from("./config/heuristics-0-64.json"),
-                    String::from("./config/heuristics-0-256.json"),
-                    String::from("./config/heuristics-20-0.json"),
-                    String::from("./config/heuristics-20-4.json"),
-                    String::from("./config/heuristics-20-16.json"),
-                    String::from("./config/heuristics-20-64.json"),
-                    String::from("./config/heuristics-20-256.json"),
-                    String::from("./config/heuristics-80-0.json"),
-                    String::from("./config/heuristics-80-4.json"),
-                    String::from("./config/heuristics-80-16.json"),
-                    String::from("./config/heuristics-80-64.json"),
-                    String::from("./config/heuristics-80-256.json"),
-                    String::from("./config/heuristics-200-0.json"),
-                    String::from("./config/heuristics-200-4.json"),
-                    String::from("./config/heuristics-200-16.json"),
-                    String::from("./config/heuristics-200-64.json"),
-                    String::from("./config/heuristics-200-256.json"),
-                    String::from("./config/heuristics-1000-0.json"),
-                    String::from("./config/heuristics-1000-4.json"),
-                    String::from("./config/heuristics-1000-16.json"),
-                    String::from("./config/heuristics-1000-64.json"),
-                    String::from("./config/heuristics-1000-256.json"),
-                ];
+                // let all_heuristics = vec![
+                //     String::from("./config/heuristics.json"),
+                //     String::from("./config/heuristics-unexplored-0.json"),
+                //     String::from("./config/heuristics-unexplored-30.json"),
+                //     String::from("./config/heuristics-unexplored-90.json"),
+                //     String::from("./config/heuristics-unexplored-180.json"),
+                // ];
+                let heuristics = String::from("./config/heuristics.json");
 
-                for heuristics in all_heuristics {
-                    let handles = run(args.count as u8, play_mode, heuristics.clone());
-                    for handle in handles {
-                        let (n, score) = handle.join().unwrap();
+                // for heuristics in all_heuristics {
+                let handles = run(args.count as u8, play_mode, heuristics.clone());
+                for handle in handles {
+                    let (n, score) = handle.join().unwrap();
 
-                        match play_mode {
-                            PlayMode::Iterations(_) => println!("iterations: {n}, score: {score}"),
-                            PlayMode::Duration(_) => println!("{heuristics},{n},{score}"),
-                        }
+                    match play_mode {
+                        PlayMode::Iterations(_) => println!("iterations: {n}, score: {score}"),
+                        PlayMode::Duration(_) => println!("{heuristics},{n},{score}"),
                     }
                 }
+                // }
             }
         }
     }

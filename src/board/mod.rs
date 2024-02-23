@@ -186,6 +186,10 @@ impl Board {
         self.iter()
     }
 
+    pub fn count_placed(&self) -> usize {
+        self.placed.len()
+    }
+
     fn insert(&mut self, square: Square<BOARD_SIZE>, placement: Placement) -> Option<Placement> {
         self.placed.push(square.raw);
         std::mem::replace(&mut self[&square], Some(placement))

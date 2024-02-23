@@ -12,9 +12,10 @@
 //! Value either by score or boolean (whether the move was chosen or not)
 
 use crate::{
-    board::{self, placement::Placement, square::Square},
+    board::{self, placement::Placement, square::Square, BOARD_SIZE},
     game::mv::Move,
-    pieces::Connection,
+    mcts::heuristics,
+    pieces::{get_piece, Connection, Piece},
 };
 use indicatif::ProgressBar;
 use std::{io::Read, time::Instant};
@@ -32,9 +33,9 @@ const MODEL_PATH: &str = "./src/mcts/heuristics/nn";
 
 // #[cfg(not(feature = "nightly"))]
 type Model = (
-    Linear<588, 16>,
+    // Linear<588, 16>,
+    Linear<595, 16>,
     ReLU,
-    // DropoutOneIn<2>,
     Linear<16, 16>,
     ReLU,
     Linear<16, 1>,
@@ -42,7 +43,7 @@ type Model = (
 );
 
 type BuildModel = (
-    modules::Linear<588, 16, f32, Cpu>,
+    modules::Linear<595, 16, f32, Cpu>,
     ReLU,
     modules::Linear<16, 16, f32, Cpu>,
     ReLU,
@@ -189,13 +190,20 @@ impl EdgeStrategy {
     // }
 
     // #[cfg(not(feature = "nightly"))]
+    /// This function returns an array of features for a placement.
+    /// The array is structured as follows:
+    /// 0–588: placements on the board
+    /// 588–595: heuristics
     fn get_features(
         board: &board::Board,
         mv: Move,
         device: &Device,
-    ) -> Tensor<Rank1<588>, f32, Cpu> {
+    ) -> Tensor<Rank1<595>, f32, Cpu> {
         let mut features = device.zeros();
-        let mut data = [0.0; 588];
+        let board_feature_count = 12 * 7 * 7;
+        let heuristics_feature_count = 7;
+
+        let mut data = [0.0; 595];
         for y in 0..board::BOARD_SIZE {
             for x in 0..board::BOARD_SIZE {
                 let ft = board[&Square::<7>::new(x, y)]
@@ -220,7 +228,18 @@ impl EdgeStrategy {
             for i in 0..4 {
                 data[start + i * 3 + 2] = 1.0;
             }
+
+            data[588..595].copy_from_slice(&[
+                board.piece_connects_to_exit(placement) as i32 as f32,
+                board.piece_count_connections(placement) as f32 / 4.0,
+                board.piece_locks_out_other_piece(placement) as i32 as f32,
+                board.piece_is_2nd_order_neighbor(placement) as i32 as f32,
+                board.piece_is_3rd_order_neighbor(placement) as i32 as f32,
+                Piece::is_optional(placement.piece) as i32 as f32,
+                board.count_placed() as f32 / (BOARD_SIZE * BOARD_SIZE) as f32,
+            ]);
         }
+
         features.copy_from(&data);
         features
     }
@@ -251,7 +270,7 @@ struct Dataset {
     // #[cfg(feature = "nightly")]
     // pub features: Vec<Tensor<Rank3<7, 7, 7>>>,
     // #[cfg(not(feature = "nightly"))]
-    pub features: Vec<Tensor<Rank1<588>, f32, Cpu>>,
+    pub features: Vec<Tensor<Rank1<595>, f32, Cpu>>,
     pub labels: Vec<Tensor<Rank1<1>, f32, Cpu>>,
 }
 
@@ -272,7 +291,7 @@ impl Dataset {
             // so that lines later in the file are more likely to be included
             let line_pct = i as f32 / total as f32;
 
-            if rng.gen::<f32>() > line_pct {
+            if rng.gen::<f32>() > line_pct.powi(2) {
                 continue;
             }
 
@@ -337,10 +356,10 @@ impl Dataset {
         device: &Device,
         indices: [usize; B],
     ) -> (
-        Tensor<Rank2<B, 588>, f32, Device>,
+        Tensor<Rank2<B, 595>, f32, Device>,
         Tensor<Rank2<B, 1>, f32, Device>,
     ) {
-        let mut features_data = Vec::with_capacity(B * 588);
+        let mut features_data = Vec::with_capacity(B * 595);
         let mut labels_data = Vec::with_capacity(B);
 
         for &index in &indices {

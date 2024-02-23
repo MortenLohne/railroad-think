@@ -30,8 +30,6 @@ pub struct Parameters {
     pub model: String,
 }
 
-/// TODO: make "from_json" and "to_json", and make the appropriate json
-// https://docs.rs/serde_json/latest/serde_json/
 impl Parameters {
     /// Save the heuristic parameters to a json file.
     /// # Errors

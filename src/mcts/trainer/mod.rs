@@ -29,9 +29,9 @@ pub fn simulated_annealing(
     heuristics.move_nn = None;
     let heuristics = heuristics;
 
-    let mut options = heuristics.parameters.as_array();
+    let options = heuristics.parameters.as_array();
 
-    let mut score = initial_score;
+    let score = initial_score;
     let mut temperature = initial_temperature;
 
     for i in 0..max_iterations {
