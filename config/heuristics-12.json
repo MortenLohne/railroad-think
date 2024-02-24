@@ -1,5 +1,5 @@
 {
-  "unexplored_value": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+  "unexplored_value": [60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0],
   "exploration_variables": [4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0],
   "special_cost": [
     -146.61258274286052, -243.67327604563462, -133.74932109127033,
@@ -17,5 +17,6 @@
   "piece_is_3rd_order_neighbor": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
   "prune_minimum_node_count": 80,
   "prune_alpha": 16.0,
-  "model": "model-2"
+  "model": "model-2",
+  "rollout_depth": 12
 }

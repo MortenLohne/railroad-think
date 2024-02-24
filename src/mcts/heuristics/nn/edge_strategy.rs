@@ -14,8 +14,7 @@
 use crate::{
     board::{self, placement::Placement, square::Square, BOARD_SIZE},
     game::mv::Move,
-    mcts::heuristics,
-    pieces::{get_piece, Connection, Piece},
+    pieces::{Connection, Piece},
 };
 use indicatif::ProgressBar;
 use std::{io::Read, time::Instant};
@@ -41,6 +40,34 @@ type Model = (
     Linear<16, 1>,
     ReLU,
 );
+
+type Model = (
+    // Linear<588, 16>,
+    Linear<595, 16>,
+    ReLU,
+    Linear<16, 16>,
+    ReLU,
+    Linear<16, 1>,
+    ReLU,
+);
+
+type ConvModel = (
+    Conv2D<7, 3, 3>,
+    Tanh,
+    Conv2D<3, 3, 3>,
+    Flatten2D,
+    Linear<147, 16>,
+    LeakyReLU<0.05>,
+);
+
+type HeuristicsModel = (
+    Linear<7, 16>,
+    LeakyReLU<0.05>,
+    Linear<16, 16>,
+    LeakyReLU<0.05>,
+);
+
+type Model = AddInto<(ConvModel, Linear<7, 16>)>;
 
 type BuildModel = (
     modules::Linear<595, 16, f32, Cpu>,
@@ -200,8 +227,8 @@ impl EdgeStrategy {
         device: &Device,
     ) -> Tensor<Rank1<595>, f32, Cpu> {
         let mut features = device.zeros();
-        let board_feature_count = 12 * 7 * 7;
-        let heuristics_feature_count = 7;
+        // let board_feature_count = 12 * 7 * 7;
+        // let heuristics_feature_count = 7;
 
         let mut data = [0.0; 595];
         for y in 0..board::BOARD_SIZE {

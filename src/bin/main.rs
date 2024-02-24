@@ -109,26 +109,27 @@ fn main() {
                     }
                 };
 
-                // let all_heuristics = vec![
-                //     String::from("./config/heuristics.json"),
-                //     String::from("./config/heuristics-unexplored-0.json"),
-                //     String::from("./config/heuristics-unexplored-30.json"),
-                //     String::from("./config/heuristics-unexplored-90.json"),
-                //     String::from("./config/heuristics-unexplored-180.json"),
-                // ];
-                let heuristics = String::from("./config/heuristics.json");
+                let all_heuristics = vec![
+                    String::from("./config/heuristics.json"),
+                    String::from("./config/heuristics-0.json"),
+                    String::from("./config/heuristics-4.json"),
+                    String::from("./config/heuristics-8.json"),
+                    String::from("./config/heuristics-12.json"),
+                    String::from("./config/heuristics-16.json"),
+                    String::from("./config/heuristics-20.json"),
+                ];
 
-                // for heuristics in all_heuristics {
-                let handles = run(args.count as u8, play_mode, heuristics.clone());
-                for handle in handles {
-                    let (n, score) = handle.join().unwrap();
+                for heuristics in all_heuristics {
+                    let handles = run(args.count as u8, play_mode, heuristics.clone());
+                    for handle in handles {
+                        let (n, score) = handle.join().unwrap();
 
-                    match play_mode {
-                        PlayMode::Iterations(_) => println!("iterations: {n}, score: {score}"),
-                        PlayMode::Duration(_) => println!("{heuristics},{n},{score}"),
+                        match play_mode {
+                            PlayMode::Iterations(_) => println!("iterations: {n}, score: {score}"),
+                            PlayMode::Duration(_) => println!("{heuristics},{n},{score}"),
+                        }
                     }
                 }
-                // }
             }
         }
     }

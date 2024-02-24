@@ -268,6 +268,10 @@ impl Edge {
             return (f64::from(game.board.score()), depth == 0);
         }
 
+        if depth >= heuristics.parameters.rollout_depth {
+            return (heuristics.get_move_estimation(&game, Move::End), false);
+        }
+
         let mv = game
             .generate_moves()
             .choose(rng)

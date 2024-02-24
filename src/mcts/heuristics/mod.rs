@@ -28,6 +28,7 @@ pub struct Parameters {
     pub prune_minimum_node_count: u16,
     pub prune_alpha: f64,
     pub model: String,
+    pub rollout_depth: u16,
 }
 
 impl Parameters {
@@ -92,9 +93,10 @@ impl From<[[f64; 7]; 8]> for Parameters {
             piece_locks_out_other_piece: array[5],
             piece_is_2nd_order_neighbor: array[6],
             piece_is_3rd_order_neighbor: array[7],
-            prune_minimum_node_count: 60,
-            prune_alpha: 4.0,
+            prune_minimum_node_count: 80,
+            prune_alpha: 16.0,
             model: String::from("model-2"),
+            rollout_depth: 5,
         }
     }
 }
