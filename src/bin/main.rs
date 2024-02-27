@@ -82,7 +82,7 @@ fn main() {
 
                 if args.generate_training_data {
                     let samples = 5;
-                    let iterations = 200;
+                    let iterations = 500;
                     mcts::trainer::generate_training_data(samples, iterations);
                 }
 
