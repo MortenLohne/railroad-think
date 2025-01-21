@@ -4,12 +4,9 @@ use crate::game::Game;
 use crate::mcts::Score;
 use crate::pieces::Piece;
 
+use ord_subset::OrdSubsetIterExt;
 use std::fs::File;
 use std::io::prelude::*;
-pub mod nn;
-use nn::edge_strategy::EdgeStrategy as NeuralNetwork;
-// use nn::face_strategy::FaceStrategy;
-use ord_subset::OrdSubsetIterExt;
 mod rave;
 
 pub type HeuristicOptions = [[f64; 7]; 8];
@@ -106,7 +103,7 @@ pub struct Heuristics {
     pub parameters: Parameters,
     pub rave: Option<rave::Rave>,
     pub tree_reuse: bool,
-    pub move_nn: Option<NeuralNetwork>,
+    pub move_nn: Option<bool>,
 }
 
 impl Heuristics {
@@ -114,11 +111,10 @@ impl Heuristics {
     pub fn new(parameters: Parameters) -> Self {
         // let mut rave = rave::Rave::new();
         // let rave = Some(rave);
-        let move_nn = Some(NeuralNetwork::load(&parameters.model.clone()));
 
         Self {
             parameters,
-            move_nn,
+            move_nn: None,
             rave: None,
             tree_reuse: true,
         }
@@ -268,10 +264,8 @@ impl Heuristics {
     #[must_use]
     pub fn get_move_estimation(&self, game: &Game, mv: Move) -> f64 {
         let board = &game.board;
-        if let Some(nn) = &self.move_nn {
-            f64::from(nn.predict(board, &mv))
-        // } else if let Some(rave) = &self.rave {
-        //     rave.get_move_estimation(board, mv)
+        if let Some(_) = &self.move_nn {
+            unimplemented!("Neural net not implemented!");
         } else {
             let turn = game.turn as usize;
             self.special_use(turn, mv)
@@ -310,14 +304,8 @@ impl Heuristics {
 
         let exploration_term = exploration_term + self.special_use(turn, mv);
 
-        if let Some(nn) = &self.move_nn {
-            let k = 5.; // Increase k to weigh the neural network more heavily
-
-            let predicted_value = f64::from(nn.predict(&game.board, &mv));
-            let n = visits as f64;
-            let beta = (k / 3.0f64.mul_add(n, k)).sqrt();
-            let q = (1.0 - beta).mul_add(ucb, beta * predicted_value);
-            q + exploration_term
+        if let Some(_) = &self.move_nn {
+            unimplemented!("Neural net not yet implemented!");
         } else if let Some(rave) = self.rave.as_ref() {
             let k = 1.;
             let rave_value = rave.get_rave(turn as u8, mv);
@@ -341,6 +329,23 @@ impl Heuristics {
 
 impl Default for Heuristics {
     fn default() -> Self {
-        Self::from_json("./config/heuristics.json").expect("Could not load default heuristics")
+        Self::from_json("./config/heuristics.json").unwrap_or_else(|_| Heuristics {
+            parameters: Parameters {
+                unexplored_value: [60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0],
+                exploration_variables: [22.0, 3.0, 3.0, 1.4, 1.0, 0.20, 2.0],
+                special_cost: [-141.0, -201.0, -131.0, -1.0, 1.0, 1.0, 0.0],
+                piece_connects_to_exit: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+                piece_connects_to_other_piece: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+                piece_locks_out_other_piece: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+                piece_is_2nd_order_neighbor: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+                piece_is_3rd_order_neighbor: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+                prune_minimum_node_count: 5,
+                prune_alpha: 0.3,
+                model: String::from("hello"),
+            },
+            rave: None,
+            tree_reuse: true,
+            move_nn: None,
+        })
     }
 }

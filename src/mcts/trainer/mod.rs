@@ -9,7 +9,6 @@ use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::thread;
 
-use super::heuristics::nn::edge_strategy::EdgeStrategy;
 #[must_use]
 /// Test random heuristic values until we find good ones.
 /// Log the results of each option somwhere so we have history.
@@ -155,7 +154,6 @@ pub fn generate_training_data(samples: u64, iterations: u64) {
 
         let mut game = Game::new_from_seed(game_seed);
         let mut mcts = MonteCarloTree::new_from_seed(game.clone(), mcts_seed);
-        mcts.heuristics.move_nn = Some(EdgeStrategy::load("model-2"));
 
         let mut data: Vec<(String, String)> = Vec::new();
 

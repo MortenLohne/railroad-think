@@ -42,7 +42,6 @@ rand = "0.8.4"
 getrandom = { version = "0.2.3", features = ["js"] }
 ord_subset = "3.1.1"
 rand_xoshiro = "0.6.0"
-dfdx = { features = ["nightly", "numpy"], version = "0.13" }
 indicatif = "0.17.3"
 clap = { version = "4.5.1", features = ["derive"] }
 
