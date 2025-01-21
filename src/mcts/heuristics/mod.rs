@@ -7,6 +7,7 @@ use crate::pieces::Piece;
 use ord_subset::OrdSubsetIterExt;
 use std::fs::File;
 use std::io::prelude::*;
+mod nn;
 mod rave;
 
 pub type HeuristicOptions = [[f64; 7]; 8];
