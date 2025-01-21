@@ -1,5 +1,3 @@
-#![feature(stdsimd)]
-
 use clap::{Args, Parser};
 use game::Game;
 use mcts::heuristics::Heuristics;
@@ -100,11 +98,11 @@ fn main() {
                     mcts::trainer::generate_training_data(samples, iterations);
                 }
 
-                if args.train {
-                    let mut model =
-                        mcts::heuristics::nn::edge_strategy::EdgeStrategy::load("model-2");
-                    model.train_model_path("model-2", 100);
-                }
+                // if args.train {
+                //     let mut model =
+                //         mcts::heuristics::nn::edge_strategy::EdgeStrategy::load("model-2");
+                //     model.train_model_path("model-2", 100);
+                // }
             }
         }
         Cli::Play(args) => {
