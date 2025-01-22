@@ -1,12 +1,12 @@
 use burn::nn::conv::{Conv2d, Conv2dConfig};
 use burn::nn::pool::{AvgPool2d, AvgPool2dConfig};
-use burn::nn::{BatchNorm, BatchNormConfig, Gelu};
+use burn::nn::Gelu;
 use burn::prelude::{Backend, Module, Tensor};
 
 #[derive(Module, Debug)]
 pub struct ConvBlock<B: Backend> {
     conv: Conv2d<B>,
-    pool: AdaptiveAvgPool2d,
+    pool: AvgPool2d,
     activation: Gelu,
 }
 

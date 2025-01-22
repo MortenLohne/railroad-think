@@ -15,7 +15,7 @@ enum Cli {
 
 #[derive(Args)]
 struct NeuralNetworkArgs {
-    #[arg(short, long, default_value_t = true)]
+    #[arg(short, long)]
     train: bool,
 
     #[arg(short, long)]

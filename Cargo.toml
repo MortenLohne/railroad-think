@@ -45,6 +45,7 @@ rand_xoshiro = "0.6.0"
 indicatif = "0.17.3"
 clap = { version = "4.5.1", features = ["derive"] }
 burn = "0.16.0"
+rusqlite = "0.32"
 
 [dev-dependencies]
 criterion = "0.3.5"
