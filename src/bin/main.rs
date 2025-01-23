@@ -1,3 +1,4 @@
+use burn::tensor::Device;
 use clap::{Args, Parser};
 use game::Game;
 use mcts::heuristics::Heuristics;
@@ -87,22 +88,25 @@ fn chaos_random() -> u128 {
 fn main() {
     match Cli::parse() {
         Cli::NN(args) => {
-            let mut initial_run = true;
+            if args.train {
+                use burn::backend;
+                type MyBackend = backend::Wgpu<f32, i32>;
+                type MyAutodiffBackend = backend::Autodiff<MyBackend>;
 
-            while args.loop_training || initial_run {
-                initial_run = false;
+                let device = backend::wgpu::WgpuDevice::default();
+                mcts::heuristics::nn::training::run::<MyAutodiffBackend>(device.clone());
+            } else {
+                let mut initial_run = true;
 
-                if args.generate_training_data {
-                    let samples = 5;
-                    let iterations = 200;
-                    mcts::trainer::generate_training_data(samples, iterations);
+                while args.loop_training || initial_run {
+                    initial_run = false;
+
+                    if args.generate_training_data {
+                        let samples = 5;
+                        let iterations = 200;
+                        mcts::trainer::generate_training_data(samples, iterations);
+                    }
                 }
-
-                // if args.train {
-                //     let mut model =
-                //         mcts::heuristics::nn::edge_strategy::EdgeStrategy::load("model-2");
-                //     model.train_model_path("model-2", 100);
-                // }
             }
         }
         Cli::Play(args) => {

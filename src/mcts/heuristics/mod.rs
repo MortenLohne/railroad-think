@@ -340,7 +340,7 @@ impl Default for Heuristics {
                 piece_locks_out_other_piece: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
                 piece_is_2nd_order_neighbor: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
                 piece_is_3rd_order_neighbor: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-                prune_minimum_node_count: 5,
+                prune_minimum_node_count: 60,
                 prune_alpha: 0.3,
                 model: String::from("hello"),
             },

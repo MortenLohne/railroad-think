@@ -44,7 +44,7 @@ ord_subset = "3.1.1"
 rand_xoshiro = "0.6.0"
 indicatif = "0.17.3"
 clap = { version = "4.5.1", features = ["derive"] }
-burn = "0.16.0"
+burn = { version = "0.16.0", features = ["dataset", "train", "wgpu"] }
 rusqlite = "0.32"
 
 [dev-dependencies]
