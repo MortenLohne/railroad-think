@@ -1,4 +1,3 @@
-use burn::tensor::Device;
 use clap::{Args, Parser};
 use game::Game;
 use mcts::heuristics::Heuristics;
@@ -31,7 +30,7 @@ struct PlayArgs {
     #[arg(long, default_value = "1")]
     count: u32,
 
-    #[arg(short, long, default_value = "1000")]
+    #[arg(short, long)]
     duration: Option<u128>,
 
     #[arg(short, long)]
@@ -94,19 +93,20 @@ fn main() {
                 // type MyAutodiffBackend = Autodiff<MyBackend>;
                 // let device = burn::backend::wgpu::WgpuDevice::default();
 
-                // use burn::backend::Autodiff;
-                // use burn_cuda::{Cuda, CudaDevice};
-                // type MyBackend = Cuda<f32, i32>;
-                // type MyAutodiffBackend = Autodiff<MyBackend>;
-                // let device = CudaDevice::default();
-
                 use burn::backend::Autodiff;
-                use burn::backend::NdArray;
+                use burn_cuda::{Cuda, CudaDevice};
+                type MyBackend = Cuda<f32, i32>;
+                type AutodiffBackend = Autodiff<MyBackend>;
+                let device = CudaDevice::default();
 
-                type Backend = NdArray<f32>;
-                type BackendDevice = <Backend as burn::tensor::backend::Backend>::Device;
-                type AutodiffBackend = Autodiff<Backend>;
-                let device = BackendDevice::default();
+                // use burn::backend::Autodiff;
+                // use burn::backend::NdArray;
+
+                // type Backend = NdArray<f32>;
+                // type BackendDevice = <Backend as burn::tensor::backend::Backend>::Device;
+                // type AutodiffBackend = Autodiff<Backend>;
+
+                // let device = BackendDevice::default();
 
                 mcts::heuristics::nn::training::run::<AutodiffBackend>(device);
             } else {
@@ -129,13 +129,13 @@ fn main() {
             while args.loop_play || initial_run {
                 initial_run = false;
 
-                // let play_mode = PlayMode::Duration(20);
-                let play_mode = PlayMode::Duration(chaos_random());
-                // let play_mode = if let Some(iterations) = args.iterations {
-                //     PlayMode::Iterations(iterations)
-                // } else {
-                //     PlayMode::Duration(args.duration.unwrap())
-                // };
+                let play_mode = if let Some(iterations) = args.iterations {
+                    PlayMode::Iterations(iterations)
+                } else if let Some(duration) = args.duration {
+                    PlayMode::Duration(duration)
+                } else {
+                    PlayMode::Duration(chaos_random())
+                };
 
                 let handles = run(args.count as u8, play_mode);
                 for handle in handles {

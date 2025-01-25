@@ -18,16 +18,6 @@ use crate::identity_hasher::BuildHasher;
 
 pub type Score = f64;
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-struct ComparableScore(Score);
-impl Ord for ComparableScore {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
-    }
-}
-
-impl Eq for ComparableScore {}
-
 #[derive(Debug, Serialize, Default)]
 pub struct Node {
     pub visits: u64,
@@ -155,20 +145,28 @@ impl Edge {
         }
 
         assert_ne!(node.children.len(), 0, "No legal moves!");
-
         let mut best_child_node_index = 0;
-
-        let parent_visits = self.visits;
-        let mut children = node
-            .children
-            .iter()
-            .filter(|edge| !edge.pruned)
-            .map(|edge| edge.exploration_value(parent_visits, heuristics, &game))
-            .enumerate()
-            .collect::<Vec<_>>();
 
         #[cfg(feature = "pruning")]
         {
+            let parent_visits = self.visits;
+            let mut children = node
+                .children
+                .iter()
+                .filter(|edge| !edge.pruned)
+                .map(|edge| edge.exploration_value(parent_visits, heuristics, &game))
+                .enumerate()
+                .collect::<Vec<_>>();
+
+            #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+            struct ComparableScore(Score);
+            impl Ord for ComparableScore {
+                fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+                    self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
+                }
+            }
+
+            impl Eq for ComparableScore {}
             let n = node.children.len();
             let t = heuristics.parameters.prune_minimum_node_count as f64;
             let alpha = heuristics.parameters.prune_alpha;

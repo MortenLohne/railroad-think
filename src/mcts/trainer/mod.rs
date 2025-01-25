@@ -3,10 +3,7 @@ use rand::Rng;
 use crate::game::Game;
 use crate::mcts::heuristics::{HeuristicOptions, Heuristics};
 use crate::mcts::MonteCarloTree;
-use core::panic;
 use indicatif::ProgressBar;
-use std::fs::OpenOptions;
-use std::io::prelude::*;
 use std::thread;
 
 #[must_use]
@@ -67,9 +64,11 @@ pub fn simulated_annealing(
         };
 
         if accept_change {
-            panic!("Accept change");
-            // score = (new_score + score) / 2.0;
-            // options[variable] = new_options[variable];
+            if true {
+                unimplemented!();
+            }
+            score = (new_score + score) / 2.0;
+            options[variable] = new_options[variable];
             // Heuristics::new(options.into())
             //     .to_csv(format!("./src/mcts/heuristics/training/heuristics_{i:03}.csv").as_str())
             //     .expect("Error: Could not save heuristics");

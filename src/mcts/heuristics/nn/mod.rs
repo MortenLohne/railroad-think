@@ -1,5 +1,4 @@
 use burn::nn::loss::{MseLoss, Reduction};
-use burn::nn::{Linear, LinearConfig};
 use burn::prelude::{Backend, Module, Tensor};
 
 mod conv;
