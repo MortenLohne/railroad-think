@@ -1,4 +1,3 @@
-use burn::data::dataset::transform::MapperDataset;
 use burn::data::dataset::InMemDataset;
 /// See: https://burn.dev/burn-book/basic-workflow/data.html
 use rusqlite::OpenFlags;
@@ -79,13 +78,13 @@ impl GameDataset {
     pub fn train() -> InMemDataset<DataItem> {
         let all = Self::get_all();
         let slice_len = (all.len() as f32 * 0.75).ceil() as usize;
-        InMemDataset::new(all[0..10].to_vec())
+        InMemDataset::new(all[0..slice_len].to_vec())
     }
 
     pub fn test() -> InMemDataset<DataItem> {
         let all = Self::get_all();
         let slice_len = (all.len() as f32 * 0.75).ceil() as usize + 1;
-        InMemDataset::new(all[10..20].to_vec())
+        InMemDataset::new(all[slice_len..].to_vec())
     }
 }
 

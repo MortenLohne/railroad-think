@@ -7,7 +7,7 @@ use burn::{
     train::{
         metric::{
             store::{Aggregate, Direction, Split},
-            CpuMemory, CpuTemperature, CpuUse, LossMetric,
+            LossMetric,
         },
         LearnerBuilder, MetricEarlyStoppingStrategy, StoppingCondition,
     },
