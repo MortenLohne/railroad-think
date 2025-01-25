@@ -25,9 +25,9 @@ impl<B: Backend> CustomModel<B> {
     pub fn init(device: &B::Device) -> Self {
         let input_b_size = 7;
 
-        let conv_block1 = ConvBlock::init(7, 16, [3, 3], device);
-        let conv_block2 = ConvBlock::init(16, 32, [3, 3], device);
-        let linear_block1 = LinearBlock::init(32 * 5 * 5 + input_b_size, 64, device);
+        let conv_block1 = ConvBlock::init(7, 1, [3, 3], device);
+        let conv_block2 = ConvBlock::init(1, 2, [3, 3], device);
+        let linear_block1 = LinearBlock::init(2 * 5 * 5 + input_b_size, 64, device);
         let output_block = LinearBlock::init(64, 1, device);
 
         Self {

@@ -28,6 +28,7 @@ impl<B: Backend> ConvBlock<B> {
 
     pub fn forward(&self, input: Tensor<B, 4>) -> Tensor<B, 4> {
         let x = self.conv.forward(input);
+        println!("{:?}", x.shape());
         let x = self.pool.forward(x);
         self.activation.forward(x)
     }

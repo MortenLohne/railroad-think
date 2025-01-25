@@ -89,12 +89,26 @@ fn main() {
     match Cli::parse() {
         Cli::NN(args) => {
             if args.train {
-                use burn::backend;
-                type MyBackend = backend::Wgpu<f32, i32>;
-                type MyAutodiffBackend = backend::Autodiff<MyBackend>;
+                // use burn::backend::{Autodiff, Wgpu};
+                // type MyBackend = Wgpu<f32, i32>;
+                // type MyAutodiffBackend = Autodiff<MyBackend>;
+                // let device = burn::backend::wgpu::WgpuDevice::default();
 
-                let device = backend::wgpu::WgpuDevice::default();
-                mcts::heuristics::nn::training::run::<MyAutodiffBackend>(device.clone());
+                // use burn::backend::Autodiff;
+                // use burn_cuda::{Cuda, CudaDevice};
+                // type MyBackend = Cuda<f32, i32>;
+                // type MyAutodiffBackend = Autodiff<MyBackend>;
+                // let device = CudaDevice::default();
+
+                use burn::backend::Autodiff;
+                use burn::backend::NdArray;
+
+                type Backend = NdArray<f32>;
+                type BackendDevice = <Backend as burn::tensor::backend::Backend>::Device;
+                type AutodiffBackend = Autodiff<Backend>;
+                let device = BackendDevice::default();
+
+                mcts::heuristics::nn::training::run::<AutodiffBackend>(device);
             } else {
                 let mut initial_run = true;
 

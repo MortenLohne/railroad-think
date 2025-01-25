@@ -18,14 +18,14 @@ use super::{
     CustomModel,
 };
 
-static ARTIFACT_DIR: &str = "/tmp/nn-data";
+static ARTIFACT_DIR: &str = "./tmp/nn-data";
 
 #[derive(Config)]
 pub struct TrainingConfig {
-    #[config(default = 10)]
+    #[config(default = 50)]
     pub num_epochs: usize,
 
-    #[config(default = 64)]
+    #[config(default = 32)]
     pub batch_size: usize,
 
     #[config(default = 4)]
@@ -68,12 +68,6 @@ pub fn run<B: AutodiffBackend>(device: B::Device) {
 
     // Model
     let learner = LearnerBuilder::new(ARTIFACT_DIR)
-        .metric_train_numeric(CpuUse::new())
-        .metric_valid_numeric(CpuUse::new())
-        .metric_train_numeric(CpuMemory::new())
-        .metric_valid_numeric(CpuMemory::new())
-        .metric_train_numeric(CpuTemperature::new())
-        .metric_valid_numeric(CpuTemperature::new())
         .metric_train_numeric(LossMetric::new())
         .metric_valid_numeric(LossMetric::new())
         .with_file_checkpointer(CompactRecorder::new())
