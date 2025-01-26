@@ -40,6 +40,9 @@ impl Node {
     }
 
     /// Expand the list of children to this node, but don't visit
+
+    // Never inline, to make CPU profiling easier
+    #[inline(never)]
     pub fn generate_children(&mut self, game: &mut Game) {
         self.children = game
             .generate_moves()
@@ -103,6 +106,9 @@ impl Edge {
     ///
     /// # Panics
     /// Panics if no legal moves could be selected from game position
+
+    // Never inline, to make CPU profiling easier
+    #[inline(never)]
     pub fn select(
         &mut self,
         mut game: Game,
@@ -230,6 +236,8 @@ impl Edge {
         heuristics.get_exploration_value(self.mv, self.mean_score, self.visits, parent_visits, game)
     }
 
+    // Never inline, to make CPU profiling easier
+    #[inline(never)]
     fn expand(&mut self, game: Game, heuristics: &mut Heuristics, rng: &mut dyn RngCore) -> Score {
         debug_assert!(self.child.is_none());
 
@@ -257,6 +265,9 @@ impl Edge {
     /// ### Ideas:
     /// * Use heuristics instead of random moves
     /// * Drop rollouts and just use the heuristic to estimate the score
+
+    // Never inline, to make CPU profiling easier
+    #[inline(never)]
     fn rollout(
         mut game: Game,
         heuristics: &mut Heuristics,

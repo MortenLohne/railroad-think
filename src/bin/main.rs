@@ -137,13 +137,24 @@ fn main() {
                     PlayMode::Duration(chaos_random())
                 };
 
-                let handles = run(args.count as u8, play_mode);
-                for handle in handles {
-                    let (n, score) = handle.join().unwrap();
+                // If we aren't running games in parallel, run the game on main thread,
+                // for easier profiling
+                if args.count == 1 {
+                    let (n, score) = play(play_mode);
 
                     match play_mode {
                         PlayMode::Iterations(_) => println!("iterations: {n}, score: {score}"),
                         PlayMode::Duration(_) => println!("{n},{score}"),
+                    }
+                } else {
+                    let handles = run(args.count as u8, play_mode);
+                    for handle in handles {
+                        let (n, score) = handle.join().unwrap();
+
+                        match play_mode {
+                            PlayMode::Iterations(_) => println!("iterations: {n}, score: {score}"),
+                            PlayMode::Duration(_) => println!("{n},{score}"),
+                        }
                     }
                 }
             }
