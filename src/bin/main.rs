@@ -3,7 +3,8 @@ use game::Game;
 use mcts::heuristics::Heuristics;
 use mcts::MonteCarloTree;
 use railroad_ink_solver::*;
-use std::thread;
+use rayon::prelude::*;
+use std::time;
 
 use rand::prelude::*;
 
@@ -27,6 +28,7 @@ struct NeuralNetworkArgs {
 
 #[derive(Args, Debug)]
 struct PlayArgs {
+    /// Number of games to play. By default, all CPU cores will be used. To use fewer cores, set the RAYON_NUM_THREADS env variable
     #[arg(long, default_value = "1")]
     count: u32,
 
@@ -142,27 +144,24 @@ fn main() {
                 };
 
                 let seed = args.seed.unwrap_or_else(|| rand::thread_rng().gen());
+                let start_time = time::Instant::now();
 
-                // If we aren't running games in parallel, run the game on main thread,
-                // for easier profiling
-                if args.count == 1 {
-                    let (n, score) = play(play_mode, seed.to_be_bytes());
-
-                    match play_mode {
+                (0..args.count)
+                    .into_par_iter()
+                    .map(|i| {
+                        // Give each thread a unique seed, while still being determinated from the root seed
+                        let seed_bytes = (seed + i as u64).to_be_bytes();
+                        play(play_mode, seed_bytes)
+                    })
+                    .for_each(|(n, score)| match play_mode {
                         PlayMode::Iterations(_) => println!("iterations: {n}, score: {score}"),
                         PlayMode::Duration(_) => println!("{n},{score}"),
-                    }
-                } else {
-                    let handles = run(args.count as u8, play_mode, seed);
-                    for handle in handles {
-                        let (n, score) = handle.join().unwrap();
-
-                        match play_mode {
-                            PlayMode::Iterations(_) => println!("iterations: {n}, score: {score}"),
-                            PlayMode::Duration(_) => println!("{n},{score}"),
-                        }
-                    }
-                }
+                    });
+                println!(
+                    "Played {} games in {:.1}s",
+                    args.count,
+                    start_time.elapsed().as_secs_f32(),
+                );
             }
         }
     }
@@ -188,21 +187,6 @@ fn main() {
     // nn.train_model_path("model-16-16");
 
     // play(1000);
-}
-
-/// Play `n` games
-/// Spawns a thread for each `n`
-/// Each thread returns play mode stats and score
-fn run(n: u8, play_mode: PlayMode, seed: u64) -> Vec<thread::JoinHandle<(u64, i32)>> {
-    (0..n)
-        .map(|i| {
-            thread::spawn(move || {
-                // Give each thread a unique seed, while still being determinated from the root seed
-                let seed_bytes = (seed + i as u64).to_be_bytes();
-                play(play_mode, seed_bytes)
-            })
-        })
-        .collect()
 }
 
 #[derive(Copy, Clone)]
