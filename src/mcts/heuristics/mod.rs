@@ -141,12 +141,12 @@ impl Heuristics {
     }
 
     #[must_use]
-    pub fn get_rollout_policy_value(&self, game: &Game, mv: Move) -> f64 {
+    pub fn get_rollout_policy_value(&mut self, game: &Game, mv: Move) -> f64 {
         self.get_move_estimation(game, mv) // todo: maybe add some randomness here
     }
 
     #[must_use]
-    pub fn select_rollout_move(&self, game: &Game, moves: Vec<Move>) -> Option<Move> {
+    pub fn select_rollout_move(&mut self, game: &Game, moves: Vec<Move>) -> Option<Move> {
         moves
             .into_iter()
             .ord_subset_max_by_key(|mv| self.get_move_estimation(game, *mv))
@@ -263,7 +263,7 @@ impl Heuristics {
     //     }
     // }
     #[must_use]
-    pub fn get_move_estimation(&self, game: &Game, mv: Move) -> f64 {
+    pub fn get_move_estimation(&mut self, game: &Game, mv: Move) -> f64 {
         let board = &game.board;
         if let Some(_) = &self.move_nn {
             unimplemented!("Neural net not implemented!");
@@ -279,8 +279,44 @@ impl Heuristics {
     }
 
     #[must_use]
-    pub fn get_exploration_value(
+    pub fn get_exploration_value_given_heuristic(
         &self,
+        mv: Move,
+        mean_score: f64,
+        visits: u64,
+        parent_visits: u64,
+        game: &Game,
+        estimated_value: f64,
+    ) -> f64 {
+        let turn = usize::from(game.turn);
+        if turn == 7 {
+            return mean_score;
+        }
+
+        let ucb = mean_score;
+        let exploration_bias = self.exploration_bias(turn);
+        let exploration: f64 = if visits == 0 {
+            // self.get_rollout_policy_value(game, mv)
+            self.parameters.unexplored_value[turn]
+        } else {
+            Score::sqrt(Score::ln(parent_visits as f64 / visits as f64))
+        };
+
+        let exploration_term = exploration_bias * exploration;
+
+        let exploration_term = exploration_term + self.special_use(turn, mv);
+
+        let k = 1.;
+        let n = visits as f64;
+        let beta = (k / 3.0f64.mul_add(n, k)).sqrt();
+        let q = (1.0 - beta).mul_add(ucb, beta * estimated_value);
+
+        q + exploration_term
+    }
+
+    #[must_use]
+    pub fn get_exploration_value(
+        &mut self,
         mv: Move,
         mean_score: f64,
         visits: u64,

@@ -83,6 +83,7 @@ pub struct Edge {
     pub mv: Move,
     pub visits: u64,
     pub mean_score: Score,
+    pub heuristic_value: Option<Score>,
     pub child: Option<SingleOrMultiple>,
     pub pruned: bool,
 }
@@ -95,6 +96,7 @@ impl Edge {
             child: None,
             visits: 0,
             mean_score: 0.,
+            heuristic_value: None,
             pruned: false,
         }
     }
@@ -205,7 +207,7 @@ impl Edge {
         {
             let mut best_exploration_value = Score::MIN;
 
-            for (i, edge) in node.children.iter().enumerate() {
+            for (i, edge) in node.children.iter_mut().enumerate() {
                 let child_exploration_value =
                     edge.exploration_value(self.visits, heuristics, &game);
                 if child_exploration_value >= best_exploration_value {
@@ -232,8 +234,24 @@ impl Edge {
         result
     }
 
-    fn exploration_value(&self, parent_visits: u64, heuristics: &Heuristics, game: &Game) -> Score {
-        heuristics.get_exploration_value(self.mv, self.mean_score, self.visits, parent_visits, game)
+    fn exploration_value(
+        &mut self,
+        parent_visits: u64,
+        heuristics: &mut Heuristics,
+        game: &Game,
+    ) -> Score {
+        if self.heuristic_value.is_none() {
+            self.heuristic_value = Some(heuristics.get_move_estimation(game, self.mv))
+        }
+
+        heuristics.get_exploration_value_given_heuristic(
+            self.mv,
+            self.mean_score,
+            self.visits,
+            parent_visits,
+            game,
+            self.heuristic_value.unwrap(),
+        )
     }
 
     // Never inline, to make CPU profiling easier
@@ -437,6 +455,7 @@ impl MonteCarloTree {
                                                 mean_score: node.visits as f64 / node.total_score,
                                                 child: Some(Single(node)),
                                                 pruned: false,
+                                                heuristic_value: None,
                                             },
                                         }
                                     }
