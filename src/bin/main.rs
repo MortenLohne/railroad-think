@@ -30,6 +30,10 @@ struct PlayArgs {
     #[arg(long, default_value = "1")]
     count: u32,
 
+    /// Seed for random number generator. If set, the games will be deterministic
+    #[arg(long)]
+    seed: Option<u64>,
+
     #[arg(short, long)]
     duration: Option<u128>,
 
@@ -137,17 +141,19 @@ fn main() {
                     PlayMode::Duration(chaos_random())
                 };
 
+                let seed = args.seed.unwrap_or_else(|| rand::thread_rng().gen());
+
                 // If we aren't running games in parallel, run the game on main thread,
                 // for easier profiling
                 if args.count == 1 {
-                    let (n, score) = play(play_mode);
+                    let (n, score) = play(play_mode, seed.to_be_bytes());
 
                     match play_mode {
                         PlayMode::Iterations(_) => println!("iterations: {n}, score: {score}"),
                         PlayMode::Duration(_) => println!("{n},{score}"),
                     }
                 } else {
-                    let handles = run(args.count as u8, play_mode);
+                    let handles = run(args.count as u8, play_mode, seed);
                     for handle in handles {
                         let (n, score) = handle.join().unwrap();
 
@@ -187,9 +193,15 @@ fn main() {
 /// Play `n` games
 /// Spawns a thread for each `n`
 /// Each thread returns play mode stats and score
-fn run(n: u8, play_mode: PlayMode) -> Vec<thread::JoinHandle<(u64, i32)>> {
+fn run(n: u8, play_mode: PlayMode, seed: u64) -> Vec<thread::JoinHandle<(u64, i32)>> {
     (0..n)
-        .map(|_| thread::spawn(move || play(play_mode)))
+        .map(|i| {
+            thread::spawn(move || {
+                // Give each thread a unique seed, while still being determinated from the root seed
+                let seed_bytes = (seed + i as u64).to_be_bytes();
+                play(play_mode, seed_bytes)
+            })
+        })
         .collect()
 }
 
@@ -201,11 +213,10 @@ enum PlayMode {
 
 /// Play single game
 /// Returns duration or iteration and score
-fn play(play_mode: PlayMode) -> (u64, i32) {
-    let mut game = Game::new();
+fn play(play_mode: PlayMode, seed: [u8; 8]) -> (u64, i32) {
+    let mut game = Game::new_from_seed(seed);
 
-    let heuristics = Heuristics::default();
-    let mut mcts = MonteCarloTree::new_with_heuristics(game.clone(), heuristics);
+    let mut mcts = MonteCarloTree::new_from_seed(game.clone(), seed);
 
     // use mcts::heuristics::nn::edge_strategy::EdgeStrategy;
     // let nn = EdgeStrategy::load("model-2");
