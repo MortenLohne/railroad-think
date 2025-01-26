@@ -220,3 +220,27 @@ pub const fn get_piece(id: u8) -> Option<Piece> {
         _ => Option::None,
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn vanilla_piece_permutations() {
+        assert_eq!(4, get_piece(0x01).unwrap().get_permutations().len());
+        assert_eq!(4, get_piece(0x02).unwrap().get_permutations().len());
+        assert_eq!(2, get_piece(0x03).unwrap().get_permutations().len());
+        assert_eq!(4, get_piece(0x04).unwrap().get_permutations().len());
+        assert_eq!(4, get_piece(0x05).unwrap().get_permutations().len());
+        assert_eq!(2, get_piece(0x06).unwrap().get_permutations().len());
+        assert_eq!(2, get_piece(0x07).unwrap().get_permutations().len());
+        assert_eq!(4, get_piece(0x08).unwrap().get_permutations().len());
+        assert_eq!(8, get_piece(0x09).unwrap().get_permutations().len());
+        assert_eq!(4, get_piece(0x0A).unwrap().get_permutations().len());
+        assert_eq!(4, get_piece(0x0B).unwrap().get_permutations().len());
+        assert_eq!(1, get_piece(0x0C).unwrap().get_permutations().len());
+        assert_eq!(1, get_piece(0x0D).unwrap().get_permutations().len());
+        assert_eq!(4, get_piece(0x0E).unwrap().get_permutations().len());
+        assert_eq!(2, get_piece(0x0F).unwrap().get_permutations().len());
+    }
+}

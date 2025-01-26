@@ -366,23 +366,6 @@ impl Heuristics {
 
 impl Default for Heuristics {
     fn default() -> Self {
-        Self::from_json("./config/heuristics.json").unwrap_or_else(|_| Heuristics {
-            parameters: Parameters {
-                unexplored_value: [60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0],
-                exploration_variables: [22.0, 3.0, 3.0, 1.4, 1.0, 0.20, 2.0],
-                special_cost: [-141.0, -201.0, -131.0, -1.0, 1.0, 1.0, 0.0],
-                piece_connects_to_exit: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-                piece_connects_to_other_piece: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-                piece_locks_out_other_piece: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-                piece_is_2nd_order_neighbor: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-                piece_is_3rd_order_neighbor: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-                prune_minimum_node_count: 60,
-                prune_alpha: 0.3,
-                model: String::from("hello"),
-            },
-            rave: None,
-            tree_reuse: true,
-            move_nn: None,
-        })
+        Self::from_json("./src/mcts/heuristics/default.json").unwrap()
     }
 }
