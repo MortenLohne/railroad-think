@@ -15,7 +15,7 @@ enum Cli {
 
 #[derive(Args)]
 struct NeuralNetworkArgs {
-    #[arg(short, long, default_value_t = true)]
+    #[arg(short, long)]
     train: bool,
 
     #[arg(short, long)]
@@ -30,7 +30,7 @@ struct PlayArgs {
     #[arg(long, default_value = "1")]
     count: u32,
 
-    #[arg(short, long, default_value = "1000")]
+    #[arg(short, long)]
     duration: Option<u128>,
 
     #[arg(short, long)]
@@ -87,22 +87,40 @@ fn chaos_random() -> u128 {
 fn main() {
     match Cli::parse() {
         Cli::NN(args) => {
-            let mut initial_run = true;
+            if args.train {
+                // use burn::backend::{Autodiff, Wgpu};
+                // type MyBackend = Wgpu<f32, i32>;
+                // type MyAutodiffBackend = Autodiff<MyBackend>;
+                // let device = burn::backend::wgpu::WgpuDevice::default();
 
-            while args.loop_training || initial_run {
-                initial_run = false;
+                use burn::backend::Autodiff;
+                use burn_cuda::{Cuda, CudaDevice};
+                type MyBackend = Cuda<f32, i32>;
+                type AutodiffBackend = Autodiff<MyBackend>;
+                let device = CudaDevice::default();
 
-                if args.generate_training_data {
-                    let samples = 5;
-                    let iterations = 200;
-                    mcts::trainer::generate_training_data(samples, iterations);
+                // use burn::backend::Autodiff;
+                // use burn::backend::NdArray;
+
+                // type Backend = NdArray<f32>;
+                // type BackendDevice = <Backend as burn::tensor::backend::Backend>::Device;
+                // type AutodiffBackend = Autodiff<Backend>;
+
+                // let device = BackendDevice::default();
+
+                mcts::heuristics::nn::training::run::<AutodiffBackend>(device);
+            } else {
+                let mut initial_run = true;
+
+                while args.loop_training || initial_run {
+                    initial_run = false;
+
+                    if args.generate_training_data {
+                        let samples = 5;
+                        let iterations = 200;
+                        mcts::trainer::generate_training_data(samples, iterations);
+                    }
                 }
-
-                // if args.train {
-                //     let mut model =
-                //         mcts::heuristics::nn::edge_strategy::EdgeStrategy::load("model-2");
-                //     model.train_model_path("model-2", 100);
-                // }
             }
         }
         Cli::Play(args) => {
@@ -111,21 +129,32 @@ fn main() {
             while args.loop_play || initial_run {
                 initial_run = false;
 
-                // let play_mode = PlayMode::Duration(20);
-                let play_mode = PlayMode::Duration(chaos_random());
-                // let play_mode = if let Some(iterations) = args.iterations {
-                //     PlayMode::Iterations(iterations)
-                // } else {
-                //     PlayMode::Duration(args.duration.unwrap())
-                // };
+                let play_mode = if let Some(iterations) = args.iterations {
+                    PlayMode::Iterations(iterations)
+                } else if let Some(duration) = args.duration {
+                    PlayMode::Duration(duration)
+                } else {
+                    PlayMode::Duration(chaos_random())
+                };
 
-                let handles = run(args.count as u8, play_mode);
-                for handle in handles {
-                    let (n, score) = handle.join().unwrap();
+                // If we aren't running games in parallel, run the game on main thread,
+                // for easier profiling
+                if args.count == 1 {
+                    let (n, score) = play(play_mode);
 
                     match play_mode {
                         PlayMode::Iterations(_) => println!("iterations: {n}, score: {score}"),
                         PlayMode::Duration(_) => println!("{n},{score}"),
+                    }
+                } else {
+                    let handles = run(args.count as u8, play_mode);
+                    for handle in handles {
+                        let (n, score) = handle.join().unwrap();
+
+                        match play_mode {
+                            PlayMode::Iterations(_) => println!("iterations: {n}, score: {score}"),
+                            PlayMode::Duration(_) => println!("{n},{score}"),
+                        }
                     }
                 }
             }

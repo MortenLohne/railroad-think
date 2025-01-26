@@ -3,10 +3,7 @@ use rand::Rng;
 use crate::game::Game;
 use crate::mcts::heuristics::{HeuristicOptions, Heuristics};
 use crate::mcts::MonteCarloTree;
-use core::panic;
 use indicatif::ProgressBar;
-use std::fs::OpenOptions;
-use std::io::prelude::*;
 use std::thread;
 
 #[must_use]
@@ -67,9 +64,11 @@ pub fn simulated_annealing(
         };
 
         if accept_change {
-            panic!("Accept change");
-            // score = (new_score + score) / 2.0;
-            // options[variable] = new_options[variable];
+            if true {
+                unimplemented!();
+            }
+            score = (new_score + score) / 2.0;
+            options[variable] = new_options[variable];
             // Heuristics::new(options.into())
             //     .to_csv(format!("./src/mcts/heuristics/training/heuristics_{i:03}.csv").as_str())
             //     .expect("Error: Could not save heuristics");
@@ -165,22 +164,19 @@ pub fn generate_training_data(samples: u64, iterations: u64) {
         }
 
         let score = game.board.score();
+        let db_connection = crate::mcts::heuristics::nn::data::get_connection();
 
-        let data = data
-            .iter()
-            .map(|(board, mv)| format!("{board},{mv},{score}"))
-            .collect::<Vec<String>>()
-            .join("\n");
-
-        let path = "./src/mcts/heuristics/nn/training_data.csv";
-        let mut file = OpenOptions::new()
-            .write(true)
-            .append(true)
-            .open(path)
-            .unwrap();
-
-        if let Err(e) = writeln!(file, "{data}") {
-            eprintln!("Couldn't write to file: {e}");
+        for (board, mv) in data.iter() {
+            db_connection
+                .execute(
+                    "INSERT INTO matches (board, move, score) VALUES (:board, :move, :score)",
+                    &[
+                        (":board", board),
+                        (":move", mv),
+                        (":score", &score.to_string()),
+                    ],
+                )
+                .expect("Could not save to database");
         }
 
         bar.println(format!("Score: {score}"));

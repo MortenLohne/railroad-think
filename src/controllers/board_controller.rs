@@ -1,5 +1,7 @@
+use crate::board::placement::Placement;
 use crate::board::Board;
 use crate::utils::set_panic_hook;
+use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -34,9 +36,11 @@ impl BoardController {
     #[must_use]
     /// # Panics
     /// Panics if serde can't serialize
-    pub fn decode(string: &JsValue) -> Self {
+    pub fn decode(string: JsValue) -> Self {
+        let board_str: String =
+            serde_wasm_bindgen::from_value(string).expect("Error decoding board");
         Self {
-            board: Board::decode(string.into_serde::<String>().unwrap().as_str()),
+            board: Board::decode(board_str.as_str()),
         }
     }
 
@@ -44,7 +48,7 @@ impl BoardController {
     /// # Panics
     /// Panics if serde can't serialize
     pub fn get(&self) -> JsValue {
-        JsValue::from_serde(&self.board).unwrap()
+        serde_wasm_bindgen::to_value(&self.board).unwrap()
     }
 
     #[wasm_bindgen(js_name = findPossible)]
@@ -55,14 +59,17 @@ impl BoardController {
     /// Returns an error if the piece can't be found
     pub fn find_possible(&self, piece: u8) -> Result<JsValue, JsValue> {
         let candidates = self.board.find_possible(piece);
-        Ok(JsValue::from_serde(&candidates).unwrap())
+        Ok(serde_wasm_bindgen::to_value(&candidates).unwrap())
     }
 
     #[wasm_bindgen(js_name = place)]
     /// # Panics
     /// Panics if serde can't serialize
-    pub fn place(&mut self, placement: &JsValue) {
-        self.board.place(placement.into_serde().unwrap());
+    pub fn place(&mut self, placement: JsValue) {
+        let placement: String =
+            serde_wasm_bindgen::from_value(placement).expect("Error decoding board");
+        let placement = Placement::from_str(placement.as_str()).expect("Error decoding board");
+        self.board.place(placement);
     }
 
     #[must_use]

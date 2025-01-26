@@ -39,14 +39,19 @@ impl GameController {
     ///
     /// # Errors
     /// Returns an error if the string can't be decoded
-    pub fn decode(&mut self, string: &JsValue) -> Result<bool, JsValue> {
-        match Game::decode(string.into_serde::<String>().unwrap().as_str()) {
-            Err(message) => Err(JsValue::from_serde(&message).unwrap()),
-            Ok(game) => {
-                self.game = game;
-                self.mcts = None;
-                Ok(true)
+    pub fn decode(&mut self, string: JsValue) -> Result<bool, JsValue> {
+        let game_str: Result<String, String> = serde_wasm_bindgen::from_value(string)?;
+        if let Ok(game_str) = game_str {
+            match Game::decode(&game_str) {
+                Err(message) => Err(serde_wasm_bindgen::to_value(&message).unwrap()),
+                Ok(game) => {
+                    self.game = game;
+                    self.mcts = None;
+                    Ok(true)
+                }
             }
+        } else {
+            Err(serde_wasm_bindgen::to_value("Error decoding game").unwrap())
         }
     }
 
@@ -56,14 +61,14 @@ impl GameController {
     pub fn get(&self) -> JsValue {
         // FIXME: this doesn't work in wasm-land.
         // Probably can't serialize the Board because of the new frontier-thing. Maybe just drop it.
-        JsValue::from_serde(&self.game).unwrap()
+        serde_wasm_bindgen::to_value(&self.game).unwrap()
     }
 
     /// # Panics
     /// Panics if serde can't serialize
     pub fn roll(&mut self) -> JsValue {
         let pieces = self.game.roll();
-        JsValue::from_serde(&pieces).unwrap()
+        serde_wasm_bindgen::to_value(&pieces).unwrap()
     }
 
     #[must_use]
@@ -72,7 +77,7 @@ impl GameController {
     /// Panics if serde can't serialize
     pub fn find_possible(&self, piece: u8) -> JsValue {
         let candidates = self.game.board.find_possible(piece);
-        JsValue::from_serde(&candidates).unwrap()
+        serde_wasm_bindgen::to_value(&candidates).unwrap()
     }
 
     /// # Panics
@@ -80,13 +85,14 @@ impl GameController {
     ///
     /// # Errors
     /// Returns an error if the piece can't be found
-    pub fn place(&mut self, placement: &JsValue) -> Result<u8, JsValue> {
-        match self.game.place(placement.into_serde().unwrap()) {
+    pub fn place(&mut self, placement: JsValue) -> Result<u8, JsValue> {
+        let placement = serde_wasm_bindgen::from_value(placement)?;
+        match self.game.place(placement) {
             Ok(piece) => {
                 self.mcts = None;
                 Ok(piece)
             }
-            Err(message) => Err(JsValue::from_serde(&message).unwrap()),
+            Err(message) => Err(serde_wasm_bindgen::to_value(&message).unwrap()),
         }
     }
 
@@ -104,7 +110,7 @@ impl GameController {
 
         let mcts = self.mcts.as_mut().unwrap();
         mcts.search();
-        JsValue::from_serde(&mcts.best_move()).unwrap()
+        serde_wasm_bindgen::to_value(&mcts.best_move()).unwrap()
     }
 
     #[wasm_bindgen(js_name = searchFor)]
@@ -119,7 +125,7 @@ impl GameController {
         mcts.search_iterations(u64::from(iterations));
         let mv = mcts.best_move();
         console_log!("{:?}", mv);
-        JsValue::from_serde(&mv).unwrap()
+        serde_wasm_bindgen::to_value(&mv).unwrap()
     }
 
     pub fn autoplay(&mut self, iterations: u32) {

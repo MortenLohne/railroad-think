@@ -18,16 +18,6 @@ use crate::identity_hasher::BuildHasher;
 
 pub type Score = f64;
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-struct ComparableScore(Score);
-impl Ord for ComparableScore {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
-    }
-}
-
-impl Eq for ComparableScore {}
-
 #[derive(Debug, Serialize, Default)]
 pub struct Node {
     pub visits: u64,
@@ -50,6 +40,9 @@ impl Node {
     }
 
     /// Expand the list of children to this node, but don't visit
+
+    // Never inline, to make CPU profiling easier
+    #[inline(never)]
     pub fn generate_children(&mut self, game: &mut Game) {
         self.children = game
             .generate_moves()
@@ -113,6 +106,9 @@ impl Edge {
     ///
     /// # Panics
     /// Panics if no legal moves could be selected from game position
+
+    // Never inline, to make CPU profiling easier
+    #[inline(never)]
     pub fn select(
         &mut self,
         mut game: Game,
@@ -155,20 +151,28 @@ impl Edge {
         }
 
         assert_ne!(node.children.len(), 0, "No legal moves!");
-
         let mut best_child_node_index = 0;
-
-        let parent_visits = self.visits;
-        let mut children = node
-            .children
-            .iter()
-            .filter(|edge| !edge.pruned)
-            .map(|edge| edge.exploration_value(parent_visits, heuristics, &game))
-            .enumerate()
-            .collect::<Vec<_>>();
 
         #[cfg(feature = "pruning")]
         {
+            let parent_visits = self.visits;
+            let mut children = node
+                .children
+                .iter()
+                .filter(|edge| !edge.pruned)
+                .map(|edge| edge.exploration_value(parent_visits, heuristics, &game))
+                .enumerate()
+                .collect::<Vec<_>>();
+
+            #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+            struct ComparableScore(Score);
+            impl Ord for ComparableScore {
+                fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+                    self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
+                }
+            }
+
+            impl Eq for ComparableScore {}
             let n = node.children.len();
             let t = heuristics.parameters.prune_minimum_node_count as f64;
             let alpha = heuristics.parameters.prune_alpha;
@@ -232,6 +236,8 @@ impl Edge {
         heuristics.get_exploration_value(self.mv, self.mean_score, self.visits, parent_visits, game)
     }
 
+    // Never inline, to make CPU profiling easier
+    #[inline(never)]
     fn expand(&mut self, game: Game, heuristics: &mut Heuristics, rng: &mut dyn RngCore) -> Score {
         debug_assert!(self.child.is_none());
 
@@ -259,6 +265,9 @@ impl Edge {
     /// ### Ideas:
     /// * Use heuristics instead of random moves
     /// * Drop rollouts and just use the heuristic to estimate the score
+
+    // Never inline, to make CPU profiling easier
+    #[inline(never)]
     fn rollout(
         mut game: Game,
         heuristics: &mut Heuristics,
