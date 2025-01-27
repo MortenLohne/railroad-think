@@ -25,7 +25,6 @@ pub struct Parameters {
     pub piece_is_3rd_order_neighbor: [f64; 7],
     pub prune_minimum_node_count: u16,
     pub prune_alpha: f64,
-    pub model: String,
 }
 
 /// TODO: make "from_json" and "to_json", and make the appropriate json
@@ -94,7 +93,6 @@ impl From<[[f64; 7]; 8]> for Parameters {
             piece_is_3rd_order_neighbor: array[7],
             prune_minimum_node_count: 60,
             prune_alpha: 4.0,
-            model: String::from("model-2"),
         }
     }
 }

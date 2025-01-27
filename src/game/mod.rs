@@ -384,11 +384,16 @@ mod test {
             assert_eq!(current_turn, game.turn);
             let mv = *game.generate_moves().choose(&mut rng).unwrap();
             game.do_move(mv);
-            if mv == Move::Roll {
-                current_turn += 1;
-                assert_eq!(4, game.to_place.len());
-            } else if matches!(mv, Move::Place(..)) {
-                placed_pieces += 1;
+
+            match mv {
+                Move::Roll => {
+                    current_turn += 1;
+                    assert_eq!(4, game.to_place.len());
+                }
+                Move::Place(..) => {
+                    placed_pieces += 1;
+                }
+                _ => (),
             }
         }
         assert_eq!(
