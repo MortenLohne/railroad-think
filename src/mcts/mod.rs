@@ -537,6 +537,8 @@ impl MonteCarloTree {
 
 #[cfg(test)]
 mod test {
+    use std::str::FromStr;
+
     use super::*;
 
     #[test]
@@ -563,6 +565,24 @@ mod test {
         let game = Game::new();
         let mut mcts = MonteCarloTree::new(game);
         mcts.search_iterations(100);
+    }
+
+    #[test]
+    fn play_random_games_test() {
+        for i in 0u64..10 {
+            let seed = i.to_be_bytes();
+            let mut game = Game::new_from_seed(seed);
+            let mut mcts = MonteCarloTree::new_from_seed(game.clone(), seed);
+            while !game.ended {
+                mcts.search_iterations(100);
+                let mv = mcts.best_move();
+
+                assert_eq!(mv, Move::from_str(&mv.to_string()).unwrap());
+                assert_eq!(game, Game::decode(&game.encode()).unwrap());
+
+                mcts = MonteCarloTree::progress(mcts, mv, &mut game);
+            }
+        }
     }
 
     #[test]
