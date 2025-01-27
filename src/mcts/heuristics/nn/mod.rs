@@ -45,8 +45,7 @@ impl<B: Backend> CustomModel<B> {
         let x = x.reshape([batch_size, dim_x * dim_y * dim_z]); // Flatten the tensor
         let x = Tensor::cat(vec![x, input_b], 1); // Concatenate along the feature dimension
         let x = self.linear_block1.forward(x);
-        let x = self.output_block.forward(x);
-        x
+        self.output_block.forward(x)
     }
 
     pub fn forward_step(&self, item: DataBatch<B>) -> RegressionOutput<B> {

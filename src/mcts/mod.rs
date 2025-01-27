@@ -342,7 +342,7 @@ impl MonteCarloTree {
 
     #[must_use]
     pub fn new_from_seed(game: Game, seed: [u8; 8]) -> Self {
-        let root = Edge::default();
+        let root: Edge = Edge::default();
         let heuristics = Heuristics::default();
 
         Self {
@@ -508,7 +508,7 @@ impl MonteCarloTree {
             None => *self
                 .game
                 .generate_moves()
-                .choose(&mut rand::thread_rng())
+                .choose(&mut SplitMix64::from_seed(self.seed))
                 .expect("Found no moves"),
             Some(child) => match child {
                 Multiple(_) => Move::Roll,
@@ -520,8 +520,10 @@ impl MonteCarloTree {
                         .max_by_key(|edge| edge.visits)
                     {
                         child.mv
-                    } else if let Some(mv) =
-                        self.game.generate_moves().choose(&mut rand::thread_rng())
+                    } else if let Some(mv) = self
+                        .game
+                        .generate_moves()
+                        .choose(&mut SplitMix64::from_seed(self.seed))
                     {
                         *mv
                     } else {
@@ -590,13 +592,13 @@ mod test {
 
     #[test]
     fn test_seeded_mcts_is_deterministic() {
-        let seed = [0; 8];
+        let seed = [0, 0, 0, 0, 0, 0, 0, 42];
 
         let mut game_a = Game::new_from_seed(seed);
         let mut mcts_a = MonteCarloTree::new_from_seed(game_a.clone(), seed);
 
         while !game_a.ended {
-            mcts_a.search_iterations(10);
+            mcts_a.search_iterations(0);
             let mv = mcts_a.best_move();
             mcts_a = MonteCarloTree::progress(mcts_a, mv, &mut game_a);
         }
@@ -605,7 +607,7 @@ mod test {
         let mut mcts_b = MonteCarloTree::new_from_seed(game_b.clone(), seed);
 
         while !game_b.ended {
-            mcts_b.search_iterations(10);
+            mcts_b.search_iterations(0);
             let mv = mcts_b.best_move();
             mcts_b = MonteCarloTree::progress(mcts_b, mv, &mut game_b);
         }

@@ -1,4 +1,5 @@
 use rand::Rng;
+use rayon::prelude::*;
 
 use crate::game::Game;
 use crate::mcts::heuristics::{HeuristicOptions, Heuristics};
@@ -142,12 +143,11 @@ pub fn play(heuristics: Heuristics) -> i32 {
 /// Generate training data for the neural network
 /// # Panics
 /// Panics if the file cannot be opened
-pub fn generate_training_data(samples: u64, iterations: u64) {
-    let mut rng = rand::thread_rng();
-
-    let bar = ProgressBar::new(samples);
+pub fn generate_training_data(count: u64, iterations: u64) {
+    let bar = ProgressBar::new(count);
     bar.inc(0);
-    for _ in 0..samples {
+    (0..count).into_par_iter().for_each(|_| {
+        let mut rng = rand::thread_rng();
         let game_seed = rng.gen();
         let mcts_seed = rng.gen();
 
@@ -157,7 +157,7 @@ pub fn generate_training_data(samples: u64, iterations: u64) {
         let mut data: Vec<(String, String)> = Vec::new();
 
         while !game.ended {
-            mcts.search_duration(iterations as u128);
+            mcts.search_iterations(iterations);
             let mv = mcts.best_move();
             data.push((game.board.encode(), format!("{mv:?}")));
             mcts = MonteCarloTree::progress(mcts, mv, &mut game);
@@ -165,11 +165,26 @@ pub fn generate_training_data(samples: u64, iterations: u64) {
 
         let score = game.board.score();
         let db_connection = crate::mcts::heuristics::nn::data::get_connection();
+        db_connection
+            .execute(
+                "
+                DELETE FROM matches
+                WHERE id IN (
+                    SELECT id FROM matches
+                    ORDER BY RANDOM()
+                    LIMIT :count
+                )",
+                &[(":count", &(data.len() - 5).to_string())],
+            )
+            .expect("Could not save to database");
 
-        for (board, mv) in data.iter() {
+        for (board, mv) in &data {
             db_connection
                 .execute(
-                    "INSERT INTO matches (board, move, score) VALUES (:board, :move, :score)",
+                    "
+                        INSERT INTO matches
+                        (board, move, score)
+                        VALUES (:board, :move, :score)",
                     &[
                         (":board", board),
                         (":move", mv),
@@ -178,9 +193,10 @@ pub fn generate_training_data(samples: u64, iterations: u64) {
                 )
                 .expect("Could not save to database");
         }
-
-        bar.println(format!("Score: {score}"));
         bar.inc(1);
-    }
+    });
+
+    // bar.println(format!("Score: {score}"));
+    // }
     bar.finish_and_clear();
 }

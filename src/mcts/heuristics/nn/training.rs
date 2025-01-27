@@ -43,7 +43,11 @@ fn create_artifact_dir(artifact_dir: &str) {
     std::fs::create_dir_all(artifact_dir).ok();
 }
 
-pub fn run<B: AutodiffBackend>(device: B::Device) {
+///
+/// # Panics
+///
+/// This function panics if the model cannot be saved
+pub fn run<B: AutodiffBackend>(device: &B::Device) {
     create_artifact_dir(ARTIFACT_DIR);
     // Config
     let config_optimizer = AdamConfig::new().with_weight_decay(Some(WeightDecayConfig::new(5e-5)));
@@ -75,12 +79,12 @@ pub fn run<B: AutodiffBackend>(device: B::Device) {
             Aggregate::Mean,
             Direction::Lowest,
             Split::Valid,
-            StoppingCondition::NoImprovementSince { n_epochs: 1 },
+            StoppingCondition::NoImprovementSince { n_epochs: 2 },
         ))
         .devices(vec![device.clone()])
         .num_epochs(config.num_epochs)
         .summary()
-        .build(CustomModel::init(&device), config.optimizer.init(), 1e-4);
+        .build(CustomModel::init(device), config.optimizer.init(), 1e-4);
 
     let model_trained = learner.fit(dataloader_train, dataloader_test);
 

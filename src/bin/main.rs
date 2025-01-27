@@ -22,6 +22,14 @@ struct NeuralNetworkArgs {
     #[arg(short, long)]
     generate_training_data: bool,
 
+    /// Number of games to play for training data generation.
+    #[arg(long, default_value = "10")]
+    count: u64,
+
+    /// Number of mcts search iterations per turn, when generating training data
+    #[arg(short, long, default_value = "700")]
+    iterations: u64,
+
     #[arg(short, long)]
     loop_training: bool,
 }
@@ -93,39 +101,35 @@ fn chaos_random() -> u128 {
 fn main() {
     match Cli::parse() {
         Cli::NN(args) => {
-            if args.train {
-                // use burn::backend::{Autodiff, Wgpu};
-                // type MyBackend = Wgpu<f32, i32>;
-                // type MyAutodiffBackend = Autodiff<MyBackend>;
-                // let device = burn::backend::wgpu::WgpuDevice::default();
+            let mut initial_run = true;
 
-                use burn::backend::Autodiff;
-                use burn_cuda::{Cuda, CudaDevice};
-                type MyBackend = Cuda<f32, i32>;
-                type AutodiffBackend = Autodiff<MyBackend>;
-                let device = CudaDevice::default();
+            while args.loop_training || initial_run {
+                initial_run = false;
 
-                // use burn::backend::Autodiff;
-                // use burn::backend::NdArray;
+                if args.generate_training_data {
+                    mcts::trainer::generate_training_data(args.count, args.iterations);
+                }
 
-                // type Backend = NdArray<f32>;
-                // type BackendDevice = <Backend as burn::tensor::backend::Backend>::Device;
-                // type AutodiffBackend = Autodiff<Backend>;
+                if args.train {
+                    // use burn::backend::{Autodiff, Wgpu};
+                    // type Backend = Wgpu<f32, i32>;
+                    // type AutodiffBackend = Autodiff<Backend>;
+                    // let device = burn::backend::wgpu::WgpuDevice::default();
 
-                // let device = BackendDevice::default();
+                    // use burn::backend::Autodiff;
+                    // use burn_cuda::{Cuda, CudaDevice};
+                    // type MyBackend = Cuda<f32, i32>;
+                    // type AutodiffBackend = Autodiff<MyBackend>;
+                    // let device = CudaDevice::default();
 
-                mcts::heuristics::nn::training::run::<AutodiffBackend>(device);
-            } else {
-                let mut initial_run = true;
+                    use burn::backend::Autodiff;
+                    use burn::backend::NdArray;
+                    type Backend = NdArray<f32>;
+                    type BackendDevice = <Backend as burn::tensor::backend::Backend>::Device;
+                    type AutodiffBackend = Autodiff<Backend>;
+                    let device = BackendDevice::default();
 
-                while args.loop_training || initial_run {
-                    initial_run = false;
-
-                    if args.generate_training_data {
-                        let samples = 5;
-                        let iterations = 200;
-                        mcts::trainer::generate_training_data(samples, iterations);
-                    }
+                    mcts::heuristics::nn::training::run::<AutodiffBackend>(&device);
                 }
             }
         }
@@ -199,7 +203,6 @@ enum PlayMode {
 /// Returns duration or iteration and score
 fn play(play_mode: PlayMode, seed: [u8; 8]) -> (u64, i32) {
     let mut game = Game::new_from_seed(seed);
-
     let mut mcts = MonteCarloTree::new_from_seed(game.clone(), seed);
 
     // use mcts::heuristics::nn::edge_strategy::EdgeStrategy;
