@@ -25,25 +25,3 @@ impl std::hash::BuildHasher for BuildHasher {
         IdentityHasher::default()
     }
 }
-
-pub mod serialize {
-    use super::BuildHasher;
-    use serde::ser::{Serialize, SerializeMap, Serializer};
-    use std::collections::HashMap;
-
-    pub fn serialize<K, V, S>(
-        hash_map: &HashMap<K, V, BuildHasher>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-        K: Serialize + std::fmt::Debug,
-        V: Serialize,
-    {
-        let mut map = serializer.serialize_map(Some(hash_map.len()))?;
-        for (k, v) in hash_map {
-            map.serialize_entry(&format!("{k:?}"), v)?;
-        }
-        map.end()
-    }
-}

@@ -1,7 +1,5 @@
-use crate::identity_hasher;
-use crate::identity_hasher::BuildHasher;
 use std::convert::TryFrom;
-use std::ops::{Index, IndexMut};
+use std::ops::{self, Index, IndexMut};
 use strum::IntoEnumIterator;
 
 pub mod direction;
@@ -24,10 +22,35 @@ pub const BOARD_SIZE: u8 = 7;
 
 use serde::Serialize;
 use serde_with::serde_as; // 1.5.1
-use std::collections::{HashMap, HashSet, LinkedList};
+use std::collections::{HashSet, LinkedList};
 
 pub mod placement;
 use placement::{Orientation, Placement};
+
+#[derive(Default, Serialize, Clone, Debug)]
+pub struct RawBoard<T> {
+    pub array: [[T; BOARD_SIZE as usize]; BOARD_SIZE as usize],
+}
+
+impl<T, const S: u8> ops::Index<Square<S>> for RawBoard<T> {
+    type Output = T;
+
+    fn index(&self, index: Square<S>) -> &Self::Output {
+        &self.array[index.y() as usize][index.x() as usize]
+    }
+}
+
+impl<T, const S: u8> ops::IndexMut<Square<S>> for RawBoard<T> {
+    fn index_mut(&mut self, index: Square<S>) -> &mut Self::Output {
+        &mut self.array[index.y() as usize][index.x() as usize]
+    }
+}
+
+impl<'a, T> RawBoard<T> {
+    fn iter(&'a self) -> impl Iterator<Item = (Square<BOARD_SIZE>, &'a T)> {
+        Square::all().map(move |square| (square, &self[square]))
+    }
+}
 
 /// `Board` represents the squares and placements on a railroad ink board
 /// TODO: _Optimization ideas_
@@ -38,8 +61,7 @@ pub struct Board {
     #[serde(serialize_with = "<[_]>::serialize")]
     pub placements: [Option<Placement>; (BOARD_SIZE as usize).pow(2)],
     placed: Vec<u8>,
-    #[serde(with = "identity_hasher::serialize")]
-    pub frontier: HashMap<Square<BOARD_SIZE>, Vec<(Direction, Connection)>, BuildHasher>,
+    pub frontier: RawBoard<Vec<(Direction, Connection)>>,
 }
 
 impl Board {
@@ -64,10 +86,10 @@ impl Board {
 
     #[must_use]
     pub fn new() -> Self {
-        let mut frontier = HashMap::with_hasher(BuildHasher);
+        let mut frontier: RawBoard<Vec<(Direction, Connection)>> = Default::default();
 
         for (loc, connect) in Self::EXITS {
-            frontier.insert(loc, vec![connect]);
+            frontier[loc] = vec![connect];
         }
 
         Self {
@@ -206,7 +228,7 @@ impl Board {
 
         let mut valid = vec![];
 
-        for (&square, arr) in &self.frontier {
+        for (square, arr) in self.frontier.iter() {
             if self.has(square) {
                 continue;
             }
@@ -305,7 +327,7 @@ impl Board {
             .map(|source_dir| Self::get_neighbor(placement.square, source_dir))
             .filter(|square| self.get(*square).is_none())
             .filter(|square| !square.out_of_bounds())
-            .any(|square| self.frontier.get(&square).is_some())
+            .any(|square| !self.frontier[square].is_empty())
     }
 
     #[must_use]
@@ -319,7 +341,7 @@ impl Board {
                     .filter(|dir| dir != &source_dir.inverse())
                     .map(|dir| Self::get_neighbor(square, dir))
                     .filter(|square| !square.out_of_bounds())
-                    .any(|square| self.frontier.get(&square).is_some())
+                    .any(|square| !self.frontier[square].is_empty())
             })
     }
 
@@ -328,15 +350,8 @@ impl Board {
         let square = placement.square;
 
         // remove placement location from frontier if a connection is made
-        let frontier = self.frontier.get_mut(&square);
-        if let Some(frontier) = frontier {
-            frontier.retain(|&(direction, connection)| {
-                !placement.has_connection(direction, connection)
-            });
-            if frontier.is_empty() {
-                self.frontier.remove(&square);
-            }
-        };
+        self.frontier[square]
+            .retain(|&(direction, connection)| !placement.has_connection(direction, connection));
 
         // add neighbour locations to frontier:
         //   if placement has a connection that direction and
@@ -356,11 +371,7 @@ impl Board {
                 }
             }
 
-            self.frontier.entry(square).or_default();
-
-            if let Some(frontier) = self.frontier.get_mut(&square) {
-                frontier.push((direction.inverse(), connection));
-            }
+            self.frontier[square].push((direction.inverse(), connection));
         }
 
         // add `placement` to the board
@@ -469,7 +480,7 @@ impl Board {
             .frontier
             .iter()
             .flat_map(|(square, connections)| connections.iter().map(move |(d, c)| (square, d, c)))
-            .filter_map(|(&square, &dir, _)| self.get(Self::get_neighbor(square, dir)).as_ref())
+            .filter_map(|(square, &dir, _)| self.get(Self::get_neighbor(square, dir)).as_ref())
             .count();
         let open_end_score = i32::try_from(open_end_score).unwrap_or(i32::MAX);
 
@@ -609,7 +620,7 @@ impl Board {
         let mut end_nodes = self
             .frontier
             .iter()
-            .flat_map(|(&from, borders)| {
+            .flat_map(|(from, borders)| {
                 borders
                     .iter()
                     .map(move |&(direction, _)| Self::get_opposite_neighbor(from, direction))

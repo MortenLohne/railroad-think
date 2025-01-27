@@ -8,6 +8,10 @@ pub struct Square<const S: u8> {
 }
 
 impl<const S: u8> Square<S> {
+    pub fn all() -> impl Iterator<Item = Self> {
+        (0..S * S).map(|i| Self { raw: i })
+    }
+
     #[must_use]
     pub fn new(x: u8, y: u8) -> Self {
         if x.max(y) >= S {
