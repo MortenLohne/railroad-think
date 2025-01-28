@@ -116,18 +116,18 @@ fn main() {
                     // type AutodiffBackend = Autodiff<Backend>;
                     // let device = burn::backend::wgpu::WgpuDevice::default();
 
-                    // use burn::backend::Autodiff;
-                    // use burn_cuda::{Cuda, CudaDevice};
-                    // type MyBackend = Cuda<f32, i32>;
-                    // type AutodiffBackend = Autodiff<MyBackend>;
-                    // let device = CudaDevice::default();
-
                     use burn::backend::Autodiff;
-                    use burn::backend::NdArray;
-                    type Backend = NdArray<f32>;
-                    type BackendDevice = <Backend as burn::tensor::backend::Backend>::Device;
-                    type AutodiffBackend = Autodiff<Backend>;
-                    let device = BackendDevice::default();
+                    use burn_cuda::{Cuda, CudaDevice};
+                    type MyBackend = Cuda<f32, i32>;
+                    type AutodiffBackend = Autodiff<MyBackend>;
+                    let device = CudaDevice::default();
+
+                    // use burn::backend::Autodiff;
+                    // use burn::backend::NdArray;
+                    // type Backend = NdArray<f32>;
+                    // type BackendDevice = <Backend as burn::tensor::backend::Backend>::Device;
+                    // type AutodiffBackend = Autodiff<Backend>;
+                    // let device = BackendDevice::default();
 
                     mcts::heuristics::nn::training::run::<AutodiffBackend>(&device);
                 }

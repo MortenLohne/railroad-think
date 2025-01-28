@@ -3,7 +3,13 @@ use crate::game::mv::Move;
 use crate::game::Game;
 use crate::mcts::Score;
 use crate::pieces::Piece;
-
+use burn::{
+    backend::{wgpu::WgpuDevice, Wgpu},
+    config::Config,
+    prelude::*,
+    record::{CompactRecorder, Recorder},
+};
+use nn::{data::DataItem, training::TrainingConfig, Model};
 use ord_subset::OrdSubsetIterExt;
 use std::fs::File;
 use std::io::prelude::*;
@@ -102,7 +108,7 @@ pub struct Heuristics {
     pub parameters: Parameters,
     pub rave: Option<rave::Rave>,
     pub tree_reuse: bool,
-    pub move_nn: Option<bool>,
+    pub move_nn: Option<Model<Wgpu>>,
 }
 
 impl Heuristics {
@@ -117,6 +123,22 @@ impl Heuristics {
             rave: None,
             tree_reuse: true,
         }
+    }
+
+    pub fn get_default_model(device: WgpuDevice) -> Model<Wgpu> {
+        const MODEL_DIR: &str = "./src/mcts/heuristics/nn";
+        let config = TrainingConfig::load(format!("{MODEL_DIR}/model.config.json"))
+            .expect("Config should exist for the model");
+        let record = CompactRecorder::new()
+            .load(format!("{MODEL_DIR}/model").into(), &device)
+            .expect("Trained model should exist");
+        let model = config.model.init(&device).load_record(record);
+        model
+    }
+
+    pub fn with_model(mut self, device: WgpuDevice) -> Self {
+        self.move_nn = Some(Self::get_default_model(device));
+        self
     }
 
     /// Export this instance of Heuristics to a `.json`-file at the given `path`
@@ -263,8 +285,16 @@ impl Heuristics {
     #[must_use]
     pub fn get_move_estimation(&mut self, game: &Game, mv: Move) -> f64 {
         let board = &game.board;
-        if let Some(_) = &self.move_nn {
-            unimplemented!("Neural net not implemented!");
+        if let Some(model) = &self.move_nn {
+            let device = model.devices().get(0).unwrap().clone();
+
+            let board_features = DataItem::get_features(board, mv);
+            let board_features = Tensor::from_data([board_features], &device);
+
+            let meta_features = DataItem::get_heuristics(board, mv);
+            let meta_features = Tensor::from_data([meta_features], &device);
+
+            model.forward(board_features, meta_features).into_scalar() as f64
         } else {
             let turn = game.turn as usize;
             self.special_use(turn, mv)

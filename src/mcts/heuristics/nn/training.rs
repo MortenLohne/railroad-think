@@ -1,8 +1,8 @@
 use burn::{
     data::dataloader::DataLoaderBuilder,
-    optim::{decay::WeightDecayConfig, AdamConfig},
+    optim::AdamConfig,
     prelude::*,
-    record::{CompactRecorder, NoStdTrainingRecorder},
+    record::CompactRecorder,
     tensor::backend::AutodiffBackend,
     train::{
         metric::{
@@ -13,22 +13,27 @@ use burn::{
     },
 };
 
+use std::fs;
+
 use super::{
     data::{DataBatcher, GameDataset},
-    CustomModel,
+    Model, ModelConfig,
 };
 
 static ARTIFACT_DIR: &str = "./tmp/nn-data";
+static MODEL_OUTPUT_DIR: &str = "./src/mcts/heuristics/nn";
 
 #[derive(Config)]
 pub struct TrainingConfig {
+    pub model: ModelConfig,
+
     #[config(default = 50)]
     pub num_epochs: usize,
 
-    #[config(default = 32)]
+    #[config(default = 256)]
     pub batch_size: usize,
 
-    #[config(default = 4)]
+    #[config(default = 8)]
     pub num_workers: usize,
 
     #[config(default = 42)]
@@ -43,15 +48,54 @@ fn create_artifact_dir(artifact_dir: &str) {
     std::fs::create_dir_all(artifact_dir).ok();
 }
 
-///
 /// # Panics
 ///
 /// This function panics if the model cannot be saved
 pub fn run<B: AutodiffBackend>(device: &B::Device) {
-    create_artifact_dir(ARTIFACT_DIR);
+    let mut checkpoint = if std::path::Path::new(&format!("{ARTIFACT_DIR}/checkpoint")).exists() {
+        fs::read_dir(format!("{ARTIFACT_DIR}/checkpoint"))
+            .unwrap()
+            .filter_map(|f| f.ok())
+            .filter_map(|dir_entry| dir_entry.file_name().into_string().ok())
+            .filter(|name| name.starts_with("model-") && name.contains("."))
+            .map(|string| (&string.as_str()[6..]).to_string())
+            .map(|string| string.split(".").next().unwrap().to_string())
+            .filter_map(|string| string.parse::<usize>().ok())
+            .fold(0, |acc, next| acc.max(next))
+    } else {
+        0
+    };
+
+    let use_checkpoint = checkpoint > 0;
+
+    if use_checkpoint {
+        for file in ["model", "optim", "scheduler"] {
+            fs::rename(
+                format!("{ARTIFACT_DIR}/checkpoint/{file}-{checkpoint}.mpk"),
+                format!("./tmp/{file}.mpk"),
+            )
+            .expect("Could not move checkpoint to temporary dir");
+        }
+    }
+
+    create_artifact_dir(&format!("{ARTIFACT_DIR}/checkpoint"));
+
+    if use_checkpoint {
+        for file in ["model", "optim", "scheduler"] {
+            fs::rename(
+                format!("./tmp/{file}.mpk"),
+                format!("{ARTIFACT_DIR}/checkpoint/{file}-1.mpk"),
+            )
+            .expect(&format!(
+                "Could not move checkpoint (./tmp/{file}-{checkpoint}.mpk) from temporary dir"
+            ));
+        }
+        checkpoint = 1;
+    }
+
     // Config
-    let config_optimizer = AdamConfig::new().with_weight_decay(Some(WeightDecayConfig::new(5e-5)));
-    let config = TrainingConfig::new(config_optimizer);
+    let config_optimizer = AdamConfig::new();
+    let config = TrainingConfig::new(ModelConfig::new(), config_optimizer).with_num_epochs(1);
     B::seed(config.seed);
 
     // Data
@@ -83,19 +127,23 @@ pub fn run<B: AutodiffBackend>(device: &B::Device) {
         ))
         .devices(vec![device.clone()])
         .num_epochs(config.num_epochs)
-        .summary()
-        .build(CustomModel::init(device), config.optimizer.init(), 1e-4);
+        .summary();
+
+    let learner = if use_checkpoint {
+        learner.checkpoint(checkpoint)
+    } else {
+        learner
+    };
+
+    let learner = learner.build(Model::init(device), config.optimizer.init(), 1e-4);
 
     let model_trained = learner.fit(dataloader_train, dataloader_test);
 
     config
-        .save(format!("{ARTIFACT_DIR}/config.json").as_str())
+        .save(format!("{MODEL_OUTPUT_DIR}/model.config.json").as_str())
         .unwrap();
 
     model_trained
-        .save_file(
-            format!("{ARTIFACT_DIR}/model"),
-            &NoStdTrainingRecorder::new(),
-        )
-        .expect("Failed to save trained model");
+        .save_file(format!("{MODEL_OUTPUT_DIR}/model"), &CompactRecorder::new())
+        .expect("Trained model should be saved successfully");
 }

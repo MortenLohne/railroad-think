@@ -89,12 +89,12 @@ impl GameDataset {
 }
 
 impl DataItem {
-    fn get_features(&self) -> [[[f32; 12]; 7]; 7] {
+    pub fn get_features(board: &Board, mv: Move) -> [[[f32; 12]; 7]; 7] {
         // let mut data = [0.0; 7 * 7 * 12];
         let mut data = [[[0.0; 12]; 7]; 7];
         for y in 0..BOARD_SIZE {
             for x in 0..BOARD_SIZE {
-                let ft = self.board[&Square::<BOARD_SIZE>::new(x, y)]
+                let ft = board[&Square::<BOARD_SIZE>::new(x, y)]
                     .map_or([0.0; 12], Self::get_features_for_placement);
                 let x = x as usize;
                 let y = y as usize;
@@ -102,7 +102,7 @@ impl DataItem {
             }
         }
 
-        if let Move::Place(placement) = self.mv {
+        if let Move::Place(placement) = mv {
             let square = placement.square;
             let x = square.x() as usize;
             let y = square.y() as usize;
@@ -134,7 +134,7 @@ impl DataItem {
         cell
     }
 
-    fn get_heuristics(&self) -> [f32; 7] {
+    pub fn get_heuristics(board: &Board, mv: Move) -> [f32; 7] {
         fn to_f32(boolean: bool) -> f32 {
             if boolean {
                 1.0
@@ -142,15 +142,15 @@ impl DataItem {
                 0.0
             }
         }
-        match self.mv {
+        match mv {
             Move::Place(placement) => [
                 0.0,
                 1.0,
-                to_f32(self.board.piece_connects_to_exit(placement)),
-                f32::from(self.board.piece_count_connections(placement)) / 4.0,
-                to_f32(self.board.piece_locks_out_other_piece(placement)),
-                to_f32(self.board.piece_is_2nd_order_neighbor(placement)),
-                to_f32(self.board.piece_is_3rd_order_neighbor(placement)),
+                to_f32(board.piece_connects_to_exit(placement)),
+                f32::from(board.piece_count_connections(placement)) / 4.0,
+                to_f32(board.piece_locks_out_other_piece(placement)),
+                to_f32(board.piece_is_2nd_order_neighbor(placement)),
+                to_f32(board.piece_is_3rd_order_neighbor(placement)),
             ],
 
             Move::Roll => [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
@@ -170,14 +170,14 @@ impl<B: Backend> Batcher<DataItem, DataBatch<B>> for DataBatcher<B> {
     fn batch(&self, items: Vec<DataItem>) -> DataBatch<B> {
         let boards = items
             .iter()
-            .map(|item| item.get_features())
+            .map(|item| DataItem::get_features(&item.board, item.mv))
             .map(|ft| TensorData::from([ft]).convert::<B::FloatElem>())
             .map(|data| Tensor::<B, 4>::from_data(data, &self.device))
             .collect();
 
         let heuristics = items
             .iter()
-            .map(|item| item.get_heuristics())
+            .map(|item| DataItem::get_heuristics(&item.board, item.mv))
             .map(|ft| TensorData::from([ft]).convert::<B::FloatElem>())
             .map(|data| Tensor::<B, 2>::from_data(data, &self.device))
             .collect();

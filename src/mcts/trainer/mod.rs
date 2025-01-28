@@ -1,11 +1,11 @@
-use rand::Rng;
-use rayon::prelude::*;
-
 use crate::game::Game;
 use crate::mcts::heuristics::{HeuristicOptions, Heuristics};
 use crate::mcts::MonteCarloTree;
 use indicatif::ProgressBar;
+use rand::Rng;
+use rayon::prelude::*;
 use std::thread;
+use std::time;
 
 #[must_use]
 /// Test random heuristic values until we find good ones.
@@ -164,35 +164,41 @@ pub fn generate_training_data(count: u64, iterations: u64) {
         }
 
         let score = game.board.score();
-        let db_connection = crate::mcts::heuristics::nn::data::get_connection();
-        db_connection
-            .execute(
-                "
-                DELETE FROM matches
-                WHERE id IN (
-                    SELECT id FROM matches
-                    ORDER BY RANDOM()
-                    LIMIT :count
-                )",
-                &[(":count", &(data.len() - 5).to_string())],
-            )
-            .expect("Could not save to database");
 
-        for (board, mv) in &data {
-            db_connection
-                .execute(
-                    "
-                        INSERT INTO matches
+        let mut db_connection = crate::mcts::heuristics::nn::data::get_connection();
+
+        while db_connection.is_busy() {
+            thread::sleep(time::Duration::from_millis(10));
+        }
+
+        let tx = db_connection.transaction().unwrap();
+
+        tx.execute(
+            "DELETE FROM matches WHERE id IN (SELECT id FROM matches ORDER BY RANDOM() LIMIT :count",
+            &[(":count", &(data.len() - 5).to_string())],
+        )
+        .ok();
+        {
+            let mut stmt = tx
+                .prepare(
+                    "INSERT INTO matches
                         (board, move, score)
                         VALUES (:board, :move, :score)",
-                    &[
-                        (":board", board),
-                        (":move", mv),
-                        (":score", &score.to_string()),
-                    ],
                 )
-                .expect("Could not save to database");
+                .ok()
+                .unwrap();
+
+            for (board, mv) in &data {
+                stmt.execute(&[
+                    (":board", board),
+                    (":move", mv),
+                    (":score", &score.to_string()),
+                ])
+                .expect("Could not save generated play to database");
+            }
         }
+        tx.commit()
+            .expect("Transaction failed: Could not save generated play to database");
         bar.inc(1);
     });
 

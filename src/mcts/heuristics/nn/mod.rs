@@ -1,5 +1,5 @@
 use burn::nn::loss::{MseLoss, Reduction};
-use burn::prelude::{Backend, Module, Tensor};
+use burn::prelude::{Backend, Config, Module, Tensor};
 
 mod conv;
 pub mod data;
@@ -12,16 +12,12 @@ use conv::ConvBlock;
 use data::DataBatch;
 use linear::LinearBlock;
 
-#[derive(Module, Debug)]
-pub struct CustomModel<B: Backend> {
-    conv_block1: ConvBlock<B>,
-    conv_block2: ConvBlock<B>,
-    linear_block1: LinearBlock<B>,
-    output_block: LinearBlock<B>,
-}
+#[derive(Config, Debug)]
+pub struct ModelConfig {}
 
-impl<B: Backend> CustomModel<B> {
-    pub fn init(device: &B::Device) -> Self {
+impl ModelConfig {
+    /// Returns the initialized model.
+    pub fn init<B: Backend>(&self, device: &B::Device) -> Model<B> {
         let input_b_size = 7;
 
         let conv_block1 = ConvBlock::init(7, 7, [3, 3], device);
@@ -29,12 +25,27 @@ impl<B: Backend> CustomModel<B> {
         let linear_block1 = LinearBlock::init(7 * 6 * 4 + input_b_size, 64, device);
         let output_block = LinearBlock::init(64, 1, device);
 
-        Self {
+        Model {
             conv_block1,
             conv_block2,
             linear_block1,
             output_block,
         }
+    }
+}
+
+#[derive(Module, Debug)]
+pub struct Model<B: Backend> {
+    conv_block1: ConvBlock<B>,
+    conv_block2: ConvBlock<B>,
+    linear_block1: LinearBlock<B>,
+    output_block: LinearBlock<B>,
+}
+
+impl<B: Backend> Model<B> {
+    pub fn init(device: &B::Device) -> Self {
+        let config = ModelConfig {};
+        config.init(device)
     }
 
     pub fn forward(&self, input_a: Tensor<B, 4>, input_b: Tensor<B, 2>) -> Tensor<B, 2> {
@@ -61,7 +72,7 @@ impl<B: Backend> CustomModel<B> {
     }
 }
 
-impl<B: AutodiffBackend> TrainStep<DataBatch<B>, RegressionOutput<B>> for CustomModel<B> {
+impl<B: AutodiffBackend> TrainStep<DataBatch<B>, RegressionOutput<B>> for Model<B> {
     fn step(&self, item: DataBatch<B>) -> TrainOutput<RegressionOutput<B>> {
         let item = self.forward_step(item);
 
@@ -69,7 +80,7 @@ impl<B: AutodiffBackend> TrainStep<DataBatch<B>, RegressionOutput<B>> for Custom
     }
 }
 
-impl<B: Backend> ValidStep<DataBatch<B>, RegressionOutput<B>> for CustomModel<B> {
+impl<B: Backend> ValidStep<DataBatch<B>, RegressionOutput<B>> for Model<B> {
     fn step(&self, item: DataBatch<B>) -> RegressionOutput<B> {
         self.forward_step(item)
     }
